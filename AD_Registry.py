@@ -1,3 +1,4 @@
+import json
 import socket
 import sys
 import time
@@ -21,9 +22,9 @@ def procesar_cliente(cliente_conexion):
             ack = "<ACK>"
             cliente_conexion.send(ack.encode())
             data = cliente_conexion.recv(1024).decode()
-            datos = data.json.loads(data)
+            datos = json.loads(data)
             #falta implementar <STX><DATA><ETX><LRC>
-           # cliente_conexion.send(genera_token().encode()) cuando los datos sean correctos
+            cliente_conexion.send(genera_token().encode()) 
             
         else:
             print("No llegó el <ENQ>")
@@ -68,12 +69,10 @@ def registro(puerto):
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        respuesta = input("No se ha establecido el número adecuado de argumentos - Puerto\n ¿Quiere insertarlo de forma manual? S/N ")
-        if respuesta == "N" or respuesta == "n":
+            print("Error debes pasar los argumentos indicados (Puerto)")
             sys.exit(1)
-        else:
-            puerto = input("Inserte un Puerto (Numerico): ")
-
+    
+    puerto = sys.argv[1]
     if puerto.isnumeric():  # Corregir aquí
         registro(int(puerto))
     else:
