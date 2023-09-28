@@ -6,7 +6,7 @@ import string
 import secrets
 
 
-def genera_token(longitud):
+def genera_token():
  
     caracteres = string.ascii_letters + string.digits
     token = ''.join(secrets.choice(caracteres) for _ in range(7))
