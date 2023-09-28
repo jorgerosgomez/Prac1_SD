@@ -2,6 +2,15 @@ import socket
 import sys
 import time
 import threading
+import string
+import secrets
+
+
+def genera_token():
+ 
+    caracteres = string.ascii_letters + string.digits
+    token = ''.join(secrets.choice(caracteres) for _ in range(7))
+    return token
 
 
 def procesar_cliente(cliente_conexion):
@@ -11,7 +20,11 @@ def procesar_cliente(cliente_conexion):
         if enq == "<ENQ>": 
             ack = "<ACK>"
             cliente_conexion.send(ack.encode())
-            # Procesar datos
+            data = cliente_conexion.recv(1024).decode()
+            datos = data.json.loads(data)
+            #falta implementar <STX><DATA><ETX><LRC>
+           # cliente_conexion.send(genera_token().encode()) cuando los datos sean correctos
+            
         else:
             print("No llegó el <ENQ>")
             cliente_conexion.close()
