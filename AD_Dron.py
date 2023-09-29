@@ -10,6 +10,17 @@ class AD_Drone:
         self.Puerto_Broker= Puerto_Broker
         self.IP_Registry = IP_Registry
         self.Puerto_Registry= Puerto_Registry
+    def registrar(self):
+        #logica del registrar en AD_Registry
+        print("por implementar")
+
+
+    def unirse_espectaculo(self):
+        #logica unise al espectaculo
+        print("Por implementar")
+
+    def funcionamiento(self):
+        print("Por implementar")
 
   
 
@@ -36,6 +47,17 @@ if __name__ == "__main__":
 
          # Crear una instancia de AD_Drone
         drone = AD_Drone(IP_Engine, Puerto_Engine, IP_Broker, Puerto_Broker, IP_Registry, Puerto_Registry)
+        while True:
+            menu =input("Elige una de las opciones:\n" +"1-Registrar\n" + "2-Unirse al espectaculo\n"+ "3-Comprobar funcionamiento")
+            if (menu== '1'):
+                drone.registrar()
+            elif (menu=='2'):
+                drone.unirse_espectaculo()
+            elif(menu=='3'):
+                drone.funcionamiento()
+            else:
+                print("Error de menu")
+                sys.exit(1)
 
     
 
