@@ -1,6 +1,10 @@
 import socket
 import sys
 
+
+
+
+
 class AD_Drone:
     #CREAMOS LA CLASE DRON
     def __init__(self,IP_Engine , Puerto_Engine, IP_Broker , Puerto_Broker,IP_Registry , Puerto_Registry):
@@ -12,8 +16,48 @@ class AD_Drone:
         self.Puerto_Registry= Puerto_Registry
     def registrar(self):
         #logica del registrar en AD_Registry
-        print("por implementar")
+        
+            try:
+                self.conectarse()
+            except ConnectionRefusedError as e:
+                print(f"Error de tipo: {e}")
+            except (socket.error, OSError) as e:
+                print(f"Error de socket: {e}")
+            except Exception as e:
+                print(f"Error: {e}")
+        
+            print("te has conectado")
+           # opcion = input("option:\n1-Dar de alta\n2-Editar\n3-Dar de baja")
+            #self.ejecutar_menu_registrar(opcion)
+    
+    def ejecutar_menu_registrar(self, opcion):
+        try:
+            if opcion == '1':
+                self.Dar_alta()
+            elif opcion == '2':
+                self.Editar()
+            elif opcion == '3':
+                self.Dar_baja()
+            else:
+                print("Opción no válida.")
+                sys.exit(1)
+        except Exception as e:
+            print(f"Error en la ejecución del menú: {e}")
+            sys.exit(1)
+    
+    def Dar_alta(self):
+         print("por implementar")
+    def Dar_baja(self):
+         print("por implementar")
+    def Editar(self):
+         print("por implementar")
 
+
+        
+    def conectarse(self):
+        with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as conexion:
+            servidor = (self.IP_Registry, self.Puerto_Registry)
+            conexion.connect(servidor)
 
     def unirse_espectaculo(self):
         #logica unise al espectaculo

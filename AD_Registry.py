@@ -42,6 +42,7 @@ def procesar_cliente(cliente_conexion):
 def registro(puerto):
     try:
         #abrimos la conexion con sockets y nos ponemos a la escucha
+        print(socket.gethostbyname("localhost"))
         conexion = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         conexion.bind(("localhost", puerto))
         conexion.listen(1)
