@@ -17,11 +17,12 @@ def genera_token():
 def procesar_cliente(cliente_conexion):
     try:
         enq = cliente_conexion.recv(1024).decode()
-
+        print(f" he recibido : {enq}")
         if enq == "<ENQ>": 
             ack = "<ACK>"
             cliente_conexion.send(ack.encode())
             data = cliente_conexion.recv(1024).decode()
+
             datos = json.loads(data)
             #falta implementar <STX><DATA><ETX><LRC>
             cliente_conexion.send(genera_token().encode()) 
@@ -42,7 +43,6 @@ def procesar_cliente(cliente_conexion):
 def registro(puerto):
     try:
         #abrimos la conexion con sockets y nos ponemos a la escucha
-        print(socket.gethostbyname("localhost"))
         conexion = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         conexion.bind(("localhost", puerto))
         conexion.listen(1)

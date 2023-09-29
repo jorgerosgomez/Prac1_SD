@@ -14,11 +14,35 @@ class AD_Drone:
         self.Puerto_Broker= Puerto_Broker
         self.IP_Registry = IP_Registry
         self.Puerto_Registry= Puerto_Registry
+    def conectar_al_servidor(self):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as cliente_conexion:
+                servidor = (self.IP_Registry, self.Puerto_Registry)
+                cliente_conexion.connect(servidor)
+                enq = "<ENQ>"
+                cliente_conexion.send(enq.encode())
+
+                #Esperamos el ACK del servidor
+                ack = cliente_conexion.recv(1024).decode()
+                if ack == "<ACK>":
+                    print("Conexión exitosa.")
+                else:
+                    print(f"No hemos recibido el ACK, cerramos conexion: {ack}")
+                    cliente_conexion.close()
+
+        except socket.error as err:
+            print(f"Error de socket: {err}")
+        except Exception as e:
+            print(f"ERROR:  {e}")
+    
+    
+    
+    
     def registrar(self):
         #logica del registrar en AD_Registry
         
             try:
-                self.conectarse()
+               self.conectar_al_servidor()
             except ConnectionRefusedError as e:
                 print(f"Error de tipo: {e}")
             except (socket.error, OSError) as e:
@@ -27,8 +51,8 @@ class AD_Drone:
                 print(f"Error: {e}")
         
             print("te has conectado")
-           # opcion = input("option:\n1-Dar de alta\n2-Editar\n3-Dar de baja")
-            #self.ejecutar_menu_registrar(opcion)
+            opcion = input("option:\n1-Dar de alta\n2-Editar\n3-Dar de baja")
+            self.ejecutar_menu_registrar(opcion)
     
     def ejecutar_menu_registrar(self, opcion):
         try:
@@ -51,25 +75,6 @@ class AD_Drone:
          print("por implementar")
     def Editar(self):
          print("por implementar")
-
-
-        
-    def conectarse(self):
-        with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as conexion:
-            servidor = (self.IP_Registry, self.Puerto_Registry)
-            conexion.connect(servidor)
-
-    def unirse_espectaculo(self):
-        #logica unise al espectaculo
-        print("Por implementar")
-
-    def funcionamiento(self):
-        print("Por implementar")
-
-  
-
-
-
 
 
 #Separamos en dos los datos introducidos por parametros con el formato <IP:PUERTO>
