@@ -1,13 +1,26 @@
 import socket
 import sys
+import json 
 
-
+def calcular_lrc(mensaje):
+    bytes_mensaje = mensaje.encode('utf-8')
+    
+    lrc = 0
+    # Calcular el LRC usando XOR
+    for byte in bytes_mensaje:
+        lrc ^= byte
+     # Convertir el resultado a una cadena hexadecimal
+    lrc_hex = format(lrc, '02X')
+    
+    return lrc_hex
 
 
 
 class AD_Drone:
     #CREAMOS LA CLASE DRON
-    def __init__(self,IP_Engine , Puerto_Engine, IP_Broker , Puerto_Broker,IP_Registry , Puerto_Registry):
+    def __init__(self,id,Alias,IP_Engine , Puerto_Engine, IP_Broker , Puerto_Broker,IP_Registry , Puerto_Registry):
+        self.Alias= Alias
+        self.id =  id
         self.IP_Engine= IP_Engine
         self.Puerto_Engine= Puerto_Engine
         self.IP_Broker = IP_Broker
@@ -26,6 +39,8 @@ class AD_Drone:
                 ack = cliente_conexion.recv(1024).decode()
                 if ack == "<ACK>":
                     print("Conexión exitosa.")
+                    opcion = input("option:\n1-Dar de alta\n2-Editar\n3-Dar de baja")
+                    self.ejecutar_menu_registrar(opcion,cliente_conexion)
                 else:
                     print(f"No hemos recibido el ACK, cerramos conexion: {ack}")
                     cliente_conexion.close()
@@ -54,10 +69,10 @@ class AD_Drone:
             opcion = input("option:\n1-Dar de alta\n2-Editar\n3-Dar de baja")
             self.ejecutar_menu_registrar(opcion)
     
-    def ejecutar_menu_registrar(self, opcion):
+    def ejecutar_menu_registrar(self, opcion, cliente_conexion):
         try:
             if opcion == '1':
-                self.Dar_alta()
+                self.Dar_alta(self,cliente_conexion)
             elif opcion == '2':
                 self.Editar()
             elif opcion == '3':
@@ -69,8 +84,27 @@ class AD_Drone:
             print(f"Error en la ejecución del menú: {e}")
             sys.exit(1)
     
-    def Dar_alta(self):
-         print("por implementar")
+    def Dar_alta(self,cliente_conexion):
+        if ack == "<ACK>":
+            print("Conexión exitosa.")
+            stx, etx = "<STX>","<ETX>"
+            dato =  {
+                'id': self.id,
+                'alias': self.Alias
+            }   
+            print(dato)
+            json_dato= json.dumps(dato)
+            lrc =  calcular_lrc(stx + json_dato + etx)
+            envio=  stx+ json_dato +etx +lrc
+            cliente_conexion.send(envio.encode())
+            ack = cliente_conexion.recv(1024).decode()
+            if ack == "<ACK>":
+                print("Mensaje enviado correctamente")
+                token = cliente_conexion.recv(1024).decode()
+                print(f"Token recibido:  {token}")
+        else:
+            print(f"No hemos recibido el ACK, cerramos conexion: {ack}")
+            cliente_conexion.close()
     def Dar_baja(self):
          print("por implementar")
     def Editar(self):
@@ -93,9 +127,10 @@ if __name__ == "__main__":
         IP_Broker , Puerto_Broker =  separar_arg(sys.argv[2])
         IP_Registry , Puerto_Registry =  separar_arg(sys.argv[3])
         print("Puertos registrados...")
-
+        id= int(input("Por favor, establece la ID del dispositivo"))
+        Alias =  input("Por favor, establece el alias del dispositivo")
          # Crear una instancia de AD_Drone
-        drone = AD_Drone(IP_Engine, Puerto_Engine, IP_Broker, Puerto_Broker, IP_Registry, Puerto_Registry)
+        drone = AD_Drone(id,Alias, IP_Engine, Puerto_Engine, IP_Broker, Puerto_Broker, IP_Registry, Puerto_Registry)
         while True:
             menu =input("Elige una de las opciones:\n" +"1-Registrar\n" + "2-Unirse al espectaculo\n"+ "3-Comprobar funcionamiento")
             if (menu== '1'):
