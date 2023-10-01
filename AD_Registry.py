@@ -19,14 +19,49 @@ def calcular_lrc(mensaje):
     lrc_hex = format(lrc, '02X')
     
     return lrc_hex
-def extraer_data(mensaje):
-    print("por implementar")
-    return mensaje
+
 def genera_token():
  
     caracteres = string.ascii_letters + string.digits
     token = ''.join(secrets.choice(caracteres) for _ in range(7))
     return token
+def desencriptar_paquete(paquete):
+   #COMPRUEBA QUE EXISTA EL STX
+    inicio = paquete.find("<STX>")
+    if inicio == -1:
+        print("STX no encontrado")
+        return None
+
+    # COMPRUEBA QUE EXISTA EL ETX
+    fin = paquete.find("<ETX>")
+    if fin == -1:
+        print("ETX no encontrado")
+        return None
+
+    #EXTRAE EL PAQUETE ELIMINANDO LAS CABECERAS
+    data = paquete[inicio + len("<STX>"):fin]
+
+    #REARAMOS EL PAQUETE ORIGINAL SIN EL LRC PARA CALCULARLO 
+    print(data)
+    lrc_calculado = calcular_lrc(f"<STX>{data}<ETX>")
+
+    # BUSCAMOS EL LRC DEL PAQUETE ORIGINAL
+    lrc_inicio = fin + len("<ETX>")
+    lrc_fin = lrc_inicio + 2
+    lrc_paquete = paquete[lrc_inicio:lrc_fin]
+
+    # Y LO COMPARAMOS
+    if lrc_calculado != lrc_paquete:       
+        print(f"Error en LRC: {lrc_paquete} != {lrc_calculado}")
+        return None
+
+    # Decodificar la DATA (asumiendo que está en formato JSON)
+    try:
+        datos_json = json.loads(data)
+        return datos_json
+    except json.JSONDecodeError as e:
+        print(f"Error al decodificar JSON: {e}")
+        return None
 
 
 def procesar_cliente(cliente_conexion):
@@ -40,7 +75,7 @@ def procesar_cliente(cliente_conexion):
             cliente_conexion.send(ack.encode())
             mensaje = cliente_conexion.recv(1024).decode()
             print(mensaje)
-            mensaje =extraer_data(mensaje) #mensaje filtrado
+            mensaje = desencriptar_paquete(mensaje) #mensaje filtrado
             if mensaje is not None:
                 
                 print(f"Datos recibidos: {mensaje}")

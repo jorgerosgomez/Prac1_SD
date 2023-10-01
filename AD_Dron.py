@@ -64,15 +64,12 @@ class AD_Drone:
                 print(f"Error de socket: {e}")
             except Exception as e:
                 print(f"Error: {e}")
-        
-            print("te has conectado")
-            opcion = input("option:\n1-Dar de alta\n2-Editar\n3-Dar de baja")
-            self.ejecutar_menu_registrar(opcion)
+
     
     def ejecutar_menu_registrar(self, opcion, cliente_conexion):
         try:
             if opcion == '1':
-                self.Dar_alta(self,cliente_conexion)
+                self.Dar_alta(cliente_conexion)
             elif opcion == '2':
                 self.Editar()
             elif opcion == '3':
@@ -85,8 +82,7 @@ class AD_Drone:
             sys.exit(1)
     
     def Dar_alta(self,cliente_conexion):
-        if ack == "<ACK>":
-            print("Conexión exitosa.")
+       
             stx, etx = "<STX>","<ETX>"
             dato =  {
                 'id': self.id,
@@ -102,9 +98,8 @@ class AD_Drone:
                 print("Mensaje enviado correctamente")
                 token = cliente_conexion.recv(1024).decode()
                 print(f"Token recibido:  {token}")
-        else:
-            print(f"No hemos recibido el ACK, cerramos conexion: {ack}")
             cliente_conexion.close()
+       
     def Dar_baja(self):
          print("por implementar")
     def Editar(self):
@@ -144,8 +139,3 @@ if __name__ == "__main__":
                 sys.exit(1)
 
     
-
-    
-
-
-
