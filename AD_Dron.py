@@ -1,6 +1,9 @@
 import socket
 import sys
-import json 
+import json
+
+
+
 
 def calcular_lrc(mensaje):
     bytes_mensaje = mensaje.encode('utf-8')
@@ -39,7 +42,7 @@ class AD_Drone:
                 ack = cliente_conexion.recv(1024).decode()
                 if ack == "<ACK>":
                     print("Conexión exitosa.")
-                    opcion = input("option:\n1-Dar de alta\n2-Editar\n3-Dar de baja")
+                    opcion = input("option:\n1-Dar de alta\n2-Editar\n3-Dar de baja\n-->")
                     self.ejecutar_menu_registrar(opcion,cliente_conexion)
                 else:
                     print(f"No hemos recibido el ACK, cerramos conexion: {ack}")
@@ -86,7 +89,8 @@ class AD_Drone:
             stx, etx = "<STX>","<ETX>"
             dato =  {
                 'id': self.id,
-                'alias': self.Alias
+                'alias': self.Alias,
+                'token' : None
             }   
             print(dato)
             json_dato= json.dumps(dato)
@@ -97,7 +101,16 @@ class AD_Drone:
             if ack == "<ACK>":
                 print("Mensaje enviado correctamente")
                 token = cliente_conexion.recv(1024).decode()
-                print(f"Token recibido:  {token}")
+                dato =  {
+                'id': self.id,
+                'alias': self.Alias,
+                'token' : token
+                }   
+                with open('dron.json', "r") as file:
+                    data = json.load(file)
+                    data.append(dato)
+                with open('dron.json', 'w') as file:
+                    json.dump(data, file, indent=4)    
             cliente_conexion.close()
        
     def Dar_baja(self):
@@ -122,8 +135,8 @@ if __name__ == "__main__":
         IP_Broker , Puerto_Broker =  separar_arg(sys.argv[2])
         IP_Registry , Puerto_Registry =  separar_arg(sys.argv[3])
         print("Puertos registrados...")
-        id= int(input("Por favor, establece la ID del dispositivo"))
-        Alias =  input("Por favor, establece el alias del dispositivo")
+        id= int(input("Por favor, establece la ID del dispositivo\n-->"))
+        Alias =  input("Por favor, establece el alias del dispositivo\n-->")
          # Crear una instancia de AD_Drone
         drone = AD_Drone(id,Alias, IP_Engine, Puerto_Engine, IP_Broker, Puerto_Broker, IP_Registry, Puerto_Registry)
         while True:
