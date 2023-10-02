@@ -1,6 +1,7 @@
 import socket
 import sys
 import json
+import jsonlines
 
 
 
@@ -88,11 +89,13 @@ class AD_Drone:
        
             stx, etx = "<STX>","<ETX>"
             dato =  {
-                'id': self.id,
-                'alias': self.Alias,
-                'token' : None
+                f"{id}":{
+                    "alias": f"{Alias}",
+                    "token": None
+                }
             }   
-            print(dato)
+          
+
             json_dato= json.dumps(dato)
             lrc =  calcular_lrc(stx + json_dato + etx)
             envio=  stx+ json_dato +etx +lrc
@@ -101,16 +104,10 @@ class AD_Drone:
             if ack == "<ACK>":
                 print("Mensaje enviado correctamente")
                 token = cliente_conexion.recv(1024).decode()
-                dato =  {
-                'id': self.id,
-                'alias': self.Alias,
-                'token' : token
-                }   
-                with open('dron.json', "r") as file:
-                    data = json.load(file)
-                    data.append(dato)
-                with open('dron.json', 'w') as file:
-                    json.dump(data, file, indent=4)    
+                dato[f"{id}"]['token'] =  token
+                print(dato)
+                with open('Dron.json', 'w') as file:
+                    json.dump(dato, file, indent=4)
             cliente_conexion.close()
        
     def Dar_baja(self):
@@ -120,6 +117,7 @@ class AD_Drone:
 
 
 #Separamos en dos los datos introducidos por parametros con el formato <IP:PUERTO>
+
 def separar_arg(arg):
     parte=arg.split(':')
     return parte[0] , int(parte[1])    
