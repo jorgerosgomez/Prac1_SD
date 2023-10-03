@@ -6,7 +6,7 @@ import threading
 import string
 import secrets
 
-
+file_bd_engine =  r'C:\Users\jorge\Desktop\uni\SD\Prac 1\bd_Engine.json'
 
 def calcular_lrc(mensaje):
     bytes_mensaje = mensaje.encode('utf-8')
@@ -19,6 +19,26 @@ def calcular_lrc(mensaje):
     lrc_hex = format(lrc, '02X')
     
     return lrc_hex
+def incluir_json(file_Dron, dato):
+                    
+    try:
+                        
+        with open(file_Dron, 'r') as file:
+            try:
+                json_data = json.load(file)
+            except json.JSONDecodeError:
+                    json_data = {}
+                        
+        json_data.setdefault("lista_de_objetos", []).append(dato)
+                        
+        with open(file_Dron, 'w') as file:
+            json.dump(json_data, file, indent=2)  # indent para una escritura más bonita
+
+    except FileNotFoundError:
+        print(f'No se encontró el archivo en la ruta: {file_Dron}')
+
+    except Exception as e:
+        print(f'Ocurrió un error: {e}')
 
 def genera_token():
  
@@ -42,7 +62,6 @@ def desencriptar_paquete(paquete):
     data = paquete[inicio + len("<STX>"):fin]
 
     #REARAMOS EL PAQUETE ORIGINAL SIN EL LRC PARA CALCULARLO 
-    print(data)
     lrc_calculado = calcular_lrc(f"<STX>{data}<ETX>")
 
     # BUSCAMOS EL LRC DEL PAQUETE ORIGINAL
@@ -65,7 +84,6 @@ def desencriptar_paquete(paquete):
 
 
 def procesar_cliente(cliente_conexion):
-    print("llega")
     try:
         
         enq = cliente_conexion.recv(1024).decode()
@@ -74,13 +92,26 @@ def procesar_cliente(cliente_conexion):
             ack = "<ACK>"
             cliente_conexion.send(ack.encode())
             mensaje = cliente_conexion.recv(1024).decode()
-            print(mensaje)
             mensaje = desencriptar_paquete(mensaje) #mensaje filtrado
             if mensaje is not None:
+            
                 
-                print(f"Datos recibidos: {mensaje}")
                 cliente_conexion.send(ack.encode())
-                cliente_conexion.send(genera_token().encode()) 
+                token= genera_token()
+                cliente_conexion.send(token.encode()) 
+               
+                try:
+                   
+                    primera_clave = next(iter(mensaje))
+                 # Cambiar el atributo "token" para la primera clave
+                    mensaje[primera_clave]["token"] = token
+                except StopIteration:
+                    print("El objeto JSON está vacío")
+                except Exception as e:
+                    print(f'Ocurrió un error: {e}')
+               
+                incluir_json(file_bd_engine,mensaje)
+                
         else:
             print("No llegó el <ENQ>")
             cliente_conexion.close()

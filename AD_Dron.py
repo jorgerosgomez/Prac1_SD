@@ -1,6 +1,10 @@
 import socket
 import sys
-import json 
+import json
+
+
+
+file_Dron= r'C:\Users\jorge\Desktop\uni\SD\Prac 1\Dron.json'
 
 def calcular_lrc(mensaje):
     bytes_mensaje = mensaje.encode('utf-8')
@@ -13,6 +17,27 @@ def calcular_lrc(mensaje):
     lrc_hex = format(lrc, '02X')
     
     return lrc_hex
+def incluir_json(file_Dron, dato):
+                    
+    try:
+                        
+        with open(file_Dron, 'r') as file:
+            try:
+                json_data = json.load(file)
+            except json.JSONDecodeError:
+                    json_data = {}
+                        
+        json_data.setdefault("lista_de_objetos", []).append(dato)
+                        
+        with open(file_Dron, 'w') as file:
+            json.dump(json_data, file, indent=2)  # indent para una escritura más bonita
+
+    except FileNotFoundError:
+        print(f'No se encontró el archivo en la ruta: {file_Dron}')
+
+    except Exception as e:
+        print(f'Ocurrió un error: {e}')
+
 
 
 
@@ -39,7 +64,7 @@ class AD_Drone:
                 ack = cliente_conexion.recv(1024).decode()
                 if ack == "<ACK>":
                     print("Conexión exitosa.")
-                    opcion = input("option:\n1-Dar de alta\n2-Editar\n3-Dar de baja")
+                    opcion = input("option:\n1-Dar de alta\n2-Editar\n3-Dar de baja\n-->")
                     self.ejecutar_menu_registrar(opcion,cliente_conexion)
                 else:
                     print(f"No hemos recibido el ACK, cerramos conexion: {ack}")
@@ -85,10 +110,13 @@ class AD_Drone:
        
             stx, etx = "<STX>","<ETX>"
             dato =  {
-                'id': self.id,
-                'alias': self.Alias
+                f"{id}":{
+                    "alias": f"{Alias}",
+                    "token": None
+                }
             }   
-            print(dato)
+          
+
             json_dato= json.dumps(dato)
             lrc =  calcular_lrc(stx + json_dato + etx)
             envio=  stx+ json_dato +etx +lrc
@@ -97,8 +125,9 @@ class AD_Drone:
             if ack == "<ACK>":
                 print("Mensaje enviado correctamente")
                 token = cliente_conexion.recv(1024).decode()
-                print(f"Token recibido:  {token}")
-            cliente_conexion.close()
+                dato[f"{id}"]['token'] =  token
+                incluir_json(file_Dron,dato) 
+                cliente_conexion.close()
        
     def Dar_baja(self):
          print("por implementar")
@@ -107,6 +136,7 @@ class AD_Drone:
 
 
 #Separamos en dos los datos introducidos por parametros con el formato <IP:PUERTO>
+
 def separar_arg(arg):
     parte=arg.split(':')
     return parte[0] , int(parte[1])    
@@ -122,8 +152,8 @@ if __name__ == "__main__":
         IP_Broker , Puerto_Broker =  separar_arg(sys.argv[2])
         IP_Registry , Puerto_Registry =  separar_arg(sys.argv[3])
         print("Puertos registrados...")
-        id= int(input("Por favor, establece la ID del dispositivo"))
-        Alias =  input("Por favor, establece el alias del dispositivo")
+        id= int(input("Por favor, establece la ID del dispositivo\n-->"))
+        Alias =  input("Por favor, establece el alias del dispositivo\n-->")
          # Crear una instancia de AD_Drone
         drone = AD_Drone(id,Alias, IP_Engine, Puerto_Engine, IP_Broker, Puerto_Broker, IP_Registry, Puerto_Registry)
         while True:
