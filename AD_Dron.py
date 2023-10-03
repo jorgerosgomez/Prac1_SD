@@ -1,10 +1,10 @@
 import socket
 import sys
 import json
-import jsonlines
 
 
 
+file_Dron= r'C:\Users\jorge\Desktop\uni\SD\Prac 1\Dron.json'
 
 def calcular_lrc(mensaje):
     bytes_mensaje = mensaje.encode('utf-8')
@@ -17,6 +17,27 @@ def calcular_lrc(mensaje):
     lrc_hex = format(lrc, '02X')
     
     return lrc_hex
+def incluir_json(file_Dron, dato):
+                    
+    try:
+                        
+        with open(file_Dron, 'r') as file:
+            try:
+                json_data = json.load(file)
+            except json.JSONDecodeError:
+                    json_data = {}
+                        
+        json_data.setdefault("lista_de_objetos", []).append(dato)
+                        
+        with open(file_Dron, 'w') as file:
+            json.dump(json_data, file, indent=2)  # indent para una escritura más bonita
+
+    except FileNotFoundError:
+        print(f'No se encontró el archivo en la ruta: {file_Dron}')
+
+    except Exception as e:
+        print(f'Ocurrió un error: {e}')
+
 
 
 
@@ -105,10 +126,8 @@ class AD_Drone:
                 print("Mensaje enviado correctamente")
                 token = cliente_conexion.recv(1024).decode()
                 dato[f"{id}"]['token'] =  token
-                print(dato)
-                with open('Dron.json', 'w') as file:
-                    json.dump(dato, file, indent=4)
-            cliente_conexion.close()
+                incluir_json(file_Dron,dato) 
+                cliente_conexion.close()
        
     def Dar_baja(self):
          print("por implementar")
