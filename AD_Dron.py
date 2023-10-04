@@ -45,13 +45,15 @@ class AD_Drone:
     #CREAMOS LA CLASE DRON
     def __init__(self,id,Alias,IP_Engine , Puerto_Engine, IP_Broker , Puerto_Broker,IP_Registry , Puerto_Registry):
         self.Alias= Alias
-        self.id =  id
+        self.id =  id #id del dispositivo
         self.IP_Engine= IP_Engine
         self.Puerto_Engine= Puerto_Engine
         self.IP_Broker = IP_Broker
         self.Puerto_Broker= Puerto_Broker
         self.IP_Registry = IP_Registry
         self.Puerto_Registry= Puerto_Registry
+        self.posicion = (0, 0)  # Posición inicial
+        self.estado = False  # Estado inicial
     def conectar_al_servidor(self):
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as cliente_conexion:
