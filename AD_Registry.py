@@ -47,6 +47,7 @@ def genera_token():
     return token
 def desencriptar_paquete(paquete):
    #COMPRUEBA QUE EXISTA EL STX
+    print(paquete)
     inicio = paquete.find("<STX>")
     if inicio == -1:
         print("STX no encontrado")
@@ -92,6 +93,7 @@ def procesar_cliente(cliente_conexion):
             ack = "<ACK>"
             cliente_conexion.send(ack.encode())
             mensaje = cliente_conexion.recv(1024).decode()
+           
             mensaje = desencriptar_paquete(mensaje) #mensaje filtrado
             if mensaje is not None:
             
