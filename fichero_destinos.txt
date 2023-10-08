@@ -1,0 +1,12 @@
+<TRIANGLE>
+<1><2><3>
+<4><5><6>
+</TRIANGLE>
+<SQUARE>
+<7><8><9>
+</SQUARE>
+<CIRCULO>
+<7><8><9>
+<1><2><3>
+<4><5><4>
+</CIRCULO>
