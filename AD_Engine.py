@@ -88,7 +88,7 @@ def extraer_destinos(ruta):
 
 def iniciar_servidor(puerto, ad_engine):
     servidor = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    servidor.bind(('localhost', puerto))
+    servidor.bind(('0.0.0.0', puerto))
     servidor.listen()
 
     print(f"Escuchando en el puerto {puerto}")

@@ -4,7 +4,7 @@ import json
 
 
 
-file_Dron= r'C:\Users\jorge\Desktop\uni\SD\Prac 1\Dron.json'
+file_Dron= 'Dron.json'
 
 def calcular_lrc(mensaje):
     bytes_mensaje = mensaje.encode('utf-8')

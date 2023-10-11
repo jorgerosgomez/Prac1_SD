@@ -6,7 +6,7 @@ import threading
 import string
 import secrets
 
-file_bd_engine =  r'C:\Users\jorge\Desktop\uni\SD\Prac 1\bd_Engine.json'
+file_bd_engine =  'bd_Engine.json'
 
 def calcular_lrc(mensaje):
     bytes_mensaje = mensaje.encode('utf-8')
@@ -130,10 +130,12 @@ def procesar_cliente(cliente_conexion):
 def registro(puerto):
     try:
         #abrimos la conexion con sockets y nos ponemos a la escucha
-        print(socket.gethostbyname("localhost"))
+        hostname = socket.gethostname()
+        IPAddr = socket.gethostbyname(hostname)
+        print("Your Computer IP Address is:" + IPAddr)
         conexion = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         conexion.bind(("0.0.0.0", puerto))
-        conexion.listen(1)
+        conexion.listen(50)
         #establecemos un tiempo de maximo en el que el servidor no tiene conxiones y si no las tiene lo cierra
         conexion.settimeout(60)
 
