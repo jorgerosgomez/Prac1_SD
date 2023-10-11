@@ -8,7 +8,7 @@ import socket
 import re
 
 
-
+numero_drones = 100
 
 def calcular_lrc(mensaje):
     bytes_mensaje = mensaje.encode('utf-8')
@@ -112,7 +112,7 @@ def manejar_conexion(conexion,ad_engine):
         id_dron , token_dron = data.split(',')
         if ad_engine.conectar_dron(int(id_dron), token_dron):
             print( "Conexión exitosa")
-            dron = Dron(identificador=int(id_dron), x=0, y=0) 
+            dron = Dron(identificador=int(id_dron), x=1, y=1) 
             drones_autenticados.append(dron)
             conexion.send("<ACK>".encode())
         else:
@@ -131,95 +131,94 @@ def separar_arg(arg):
     return parte[0] , int(parte[1]) 
 
 
-class Dron:
-    def __init__(self, identificador, x, y):
-        self.identificador = identificador
-        self.llego_a_destino = False
-        self.x = x
-        self.y = y
-
-    def mover(self, dx, dy):
-        """Desplaza el dron en las direcciones dx y dy."""
-        self.x += dx
-        self.y += dy
-
-    def establecer_destino(self, destino_x, destino_y):
-        """Establece un destino para el dron."""
-        self.destino_x = destino_x
-        self.destino_y = destino_y
-        self.llego_a_destino = False  # Resetear la condicion
-
-    def comprobar_destino(self):
-        """Comprueba si el dron ha llegado a su destino."""
-        if self.x == self.destino_x and self.y == self.destino_y:
-            self.llego_a_destino = True
-        return self.llego_a_destino
-
-class EspacioAereo:
-    def __init__(self, filas, columnas):
-        self.mapa = [[' ' for _ in range(columnas)] for _ in range(filas)]
-
-    def colocar_dron(self, dron):
-        x, y = dron.x, dron.y
-        self.mapa[x][y] = dron  # Guardar la posición específica del dron
-
-    def pintar_dron(self):
-        # Imprimir las coordenadas superiores
-        print('    ' + ' '.join(f'{i:02d}' for i in range(len(self.mapa[0]))))
-
-        for i in range(len(self.mapa)):
-            # Imprimir el número de fila
-            print(f'{i:02d} |', end=' ')
-            
-            for j in range(len(self.mapa[0])):
-                dron = self.mapa[i][j]
-                if dron != ' ':
-                    if dron.llego_a_destino:
-                        print(f'\033[32m[{dron.identificador}]\033[0m', end=' ')  # Verde
-                    else:
-                        print(f'\033[31m[{dron.identificador}]\033[0m', end=' ')  # Rojo
+class EspacioAereo:#CREAMOS LA CLASE ESPACIO AEREO DONDE SIMULAREMOS UN ESPACIO 2D
+    def __init__(self, dimension, lista_drones):#INICIALIZAMOS LA CLASE CON LAS VARIABLES
+        self.dimension = dimension #DIMENSION QUE SERA DxD
+        self.lista_drones = lista_drones #UNA LISTA DE DRONES QUE SERAN LOS DRONES PREVIAMENTE AUTENTICADOS
+        self.mapa = [[' ' for _ in range(dimension)] for _ in range(dimension)] #UNA VARIABLE MAPA
+        self.inicializar_mapa() #E INICIALIZAMOS CON LOS DRONES DENTRO QUE TENGAMOS EN NUESTRA LISTA DE DRONES AUTENTICADOS
+        
+    def inicializar_mapa(self):#INICIALIAR EL MAPA CONSISTE EN  MAPEAR EL MAPA COLOCANDO DRON EN LA POSICION QUE TOCA
+        for dron in self.lista_drones:
+            x, y = dron.posicion
+            if self.mapa[x][y] == ' ':
+                self.mapa[x][y] = str(dron.identificador) #EN LA POSCION DONDE HAY DRON SE ESCRIBIRA SU ID
+            else:
+                #SI HAY MAS DE UN DRON SERA EL ID CON MENOR NUMERO DE TODOS EL QUE APARECERA POR PANTALLA 
+                self.mapa[x][y] = str(min(int(self.mapa[x][y]), dron.identificador))
+                
+    def actualizar_mapa(self): #ACTUALIZAR EL MAPA CONSISTE EN RESFRESCAR EL MAPA YA QUE LOS DRONES HABRAN CAMBIADO DE POSICION 
+        self.mapa = [[' ' for _ in range(self.dimension)] for _ in range(self.dimension)]
+        self.inicializar_mapa()
+    
+    def imprimir_mapa(self):  #AQUI IMPRIMIMOS EL MAPA 
+        GREEN = '\033[92m'
+        RED = '\033[91m'
+        END = '\033[0m'
+        #CREAMOS LAS VARIABLE DE COLOR PARA PODER PINTAR LOS DRONES SEGUN SE ESTAN MOVIENDO 
+        print('    ' + ' '.join([f"{i:02}" for i in range(self.dimension)]))
+        for i in range(self.dimension):
+            line = []
+            for cell in self.mapa[i]:
+                if cell != ' ':
+                    dron_id = int(cell)
+                    if self.lista_drones[dron_id - 1].llego_a_destino:  # -1 porque la lista comienza en 0
+                        line.append(RED + cell + END)
+                    else: #DEPENDE SI EL DRON EN CUESTION DE LA LISTA LLEGO A SU DESTINO SE PINTARA DE UN COLOR  U OTRO
+                        line.append(GREEN + cell + END)
                 else:
-                    print('[ ]', end=' ')
+                    line.append(cell)
+            print(f"{i:02} | [" + "] [".join(line) + "] | " + f"{i:02}")
+        print('    ' + ' '.join([f"{i:02}" for i in range(self.dimension)]))
 
-            print(f'| {i:02d}')  # Imprimir el número de fila al final
+    def obtener_destino(self, dron_id, destinos):# ESTA FUNCION NOS CALCULARA DELVUELVE LA POSCION DE DESTINO DE CADA DRON
+        for formacion, drones in destinos.items():
+            for drone in drones:
+                if drone["id"] == dron_id:
+                    return drone["posicion"]
+        return None
+    
+    def mover_drones_hacia_destinos(self, destinos):# ESTA FUNCION MUEVE LOS DRONES HACIA EL DESTINO QUE DEBEN IR Y ACTUALIZA EL MAPA
+        for dron in self.lista_drones:
+            destino = self.obtener_destino(dron.identificador, destinos)
+            if destino:
+                dron.mover_hacia_destino(destino)
+        self.actualizar_mapa()
+    def todos_llegaron_a_destino(self, drones): #COMPRUEBA SI TODOS LOS DRONES HAN LLEGADO AL DESTINO PARA ACABAR LA FUNCION Y SEGUIR CON LA SIGUIENTE FIGURA
+        for dron in drones:
+            if not dron.llego_a_destino:
+                return False
+        return True
+    def simulacion(self, destinos, drones_autenticados):#HACE LA SIMULACION DEL ESPECTACULO
+        from time import sleep
+            
+        while not self.todos_llegaron_a_destino(drones_autenticados):
+            self.mover_drones_hacia_destinos(destinos)
+            print("\nMapa después de mover:")
+            sleep(1)
+            self.imprimir_mapa()
 
-        # Imprimir las coordenadas inferiores
-        print('    ' + ' '.join(f'{i:02d}' for i in range(len(self.mapa[0]))))
+        print("\nTodos los drones han llegado a su destino!")
+        sys.exit(0)  # Termina el programa
 
-    def mover_dron(self, dron, tecla):
-        x, y = dron.x, dron.y
-        nueva_posicion = self.calcular_nueva_posicion(x, y, tecla)
-        self.mapa[x][y] = ' '  # Limpiar la posición actual
-        dron.x, dron.y = nueva_posicion
-        self.colocar_dron(dron)
+class Dron:
+    def __init__(self, identificador, posicion):
+        self.identificador = identificador
+        self.posicion = list(posicion)
+        self.llego_a_destino = False
+        
+    def mover_hacia_destino(self, destino):
+        dx = destino[0] - self.posicion[0]
+        dy = destino[1] - self.posicion[1]
+        
+        if dx > 0: self.posicion[0] += 1
+        elif dx < 0: self.posicion[0] -= 1
 
-    def calcular_nueva_posicion(self, x, y, tecla):
-        # Moverse
-        if tecla == 'w':
-            x -= 1
-        elif tecla == 's':
-            x += 1
-        elif tecla == 'a':
-            y -= 1
-        elif tecla == 'd':
-            y += 1
-        return x, y
+        if dy > 0: self.posicion[1] += 1
+        elif dy < 0: self.posicion[1] -= 1
 
-    def obtener_movimiento_hasta_posicion(self, dron, objetivo):
-        dx = objetivo[0] - dron.x
-        dy = objetivo[1] - dron.y
-
-        if dx > 0:
-            return 's'
-        elif dx < 0:
-            return 'w'
-        elif dy > 0:
-            return 'd'
-        elif dy < 0:
-            return 'a'
-        else:
-            return None  # Si ya estamos en la posición objetivo
-
+        if tuple(self.posicion) == destino:
+            self.llego_a_destino = True
 
 class AD_Engine:
     
@@ -240,25 +239,32 @@ class AD_Engine:
             return False
 
 
-
-
-
-
-
-
-
 if __name__ == "__main__":
 
     if len(sys.argv) != 5:
         print("Error de argumentos..")
         sys.exit(1)
-     
-    drones_autenticados = []    
-   # ruta = input("Introduce ruta del fichero a procesar --> \n")
-    destinos = extraer_destinos("C:\\Users\\jorge\\Desktop\\uni\\SD\\Prac 1\\fichero_destinos.txt")
-    
+  
+    destinos = extraer_destinos("./fichero_destinos.txt")
 
+
+    
+    drones_autenticados = []
+        
+    for i in range(1, 61):
+        drone = Dron(identificador=i, posicion=(0,0))
+        drones_autenticados.append(drone)
+    print(len(drones_autenticados))
+
+ 
+    espacio = EspacioAereo(20, drones_autenticados)
+    print("\t\t EL ESPECTACULO COMIENZA...")
+    espacio.imprimir_mapa() 
+    sleep(5)
+    espacio.simulacion(destinos, drones_autenticados)
+    """"
     puerto_escucha, numero_drones, ip_puerto_broker, ip_puerto_weather = sys.argv[1:5]
     espacio = EspacioAereo(20, 20)
     ip_weather, puerto_weather = separar_arg(ip_puerto_weather)
     productor_kafka = KafkaProducer(bootstrap_servers=ip_puerto_broker, value_serializer=lambda x: dumps(x).encode('utf-8'))
+    """

@@ -132,7 +132,7 @@ def registro(puerto):
         #abrimos la conexion con sockets y nos ponemos a la escucha
         print(socket.gethostbyname("localhost"))
         conexion = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        conexion.bind(("localhost", puerto))
+        conexion.bind(("0.0.0.0", puerto))
         conexion.listen(1)
         #establecemos un tiempo de maximo en el que el servidor no tiene conxiones y si no las tiene lo cierra
         conexion.settimeout(60)
