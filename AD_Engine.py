@@ -9,6 +9,8 @@ import re
 
 
 numero_drones = 100
+file_engine = 'bd_Engine.json'
+drones_autenticados =[]
 
 def calcular_lrc(mensaje):
     bytes_mensaje = mensaje.encode('utf-8')
@@ -85,26 +87,29 @@ def extraer_destinos(ruta):
 
     return destinos
 
-
-def iniciar_servidor(puerto, ad_engine):
-    servidor = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    servidor.bind(('0.0.0.0', puerto))
-    servidor.listen()
-
-    print(f"Escuchando en el puerto {puerto}")
-
+def escuchar_conexiones(servidor, ad_engine):
     while True:
         conexion, direccion = servidor.accept()
         print(f"Conexión entrante de {direccion}")
+        threading.Thread(target=manejar_conexion, args=(conexion, ad_engine)).start()
 
-        #iniciar un hilo para manejar la conexion
-        threading.Thread(target=manejar_conexion, args=(conexion,ad_engine)).start()
+
+def iniciar_servidor(puerto, ad_engine):
+    servidor = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    servidor.bind(("0.0.0.0", int(puerto)))
+    servidor.listen(20)
+    servidor.settimeout(90)
+
+    print(f"Escuchando en el puerto {puerto}")
+    threading.Thread(target=escuchar_conexiones, args=(servidor, ad_engine)).start()
+ 
         
 def manejar_conexion(conexion,ad_engine):
     #recibir datos del cliente (en este caso, asumimos que recibes id y token como cadena)
     try:
-        data = conexion.recv(1024)
+        data = conexion.recv(1024).decode()
         data =desempaquetar_string(data)
+        
         if not data:
             conexion.send("Formato incorrecto").encode()
             conexion.close()#le cerramos la conexion
@@ -112,7 +117,7 @@ def manejar_conexion(conexion,ad_engine):
         id_dron , token_dron = data.split(',')
         if ad_engine.conectar_dron(int(id_dron), token_dron):
             print( "Conexión exitosa")
-            dron = Dron(identificador=int(id_dron), x=1, y=1) 
+            dron = Dron(identificador=int(id_dron),posicion=(0,0)) 
             drones_autenticados.append(dron)
             conexion.send("<ACK>".encode())
         else:
@@ -222,20 +227,30 @@ class Dron:
 
 class AD_Engine:
     
-    def __init__(self, json_file):
-        with open(json_file) as f:
+    def __init__(self):
+        with open(file_engine) as f:
             self.lista_de_objetos = json.load(f)['lista_de_objetos']
+        
+        self.drones_conectados = 0
 
     def verificar(self,id,token):
+        print("entra verificar")
+        with open(file_engine) as f:
+            self.lista_de_objetos = json.load(f)['lista_de_objetos']
+        print(self.lista_de_objetos)
         for dron_info in self.lista_de_objetos:
             if str(id) in dron_info and dron_info[str(id)]['token'] == token:
+                
                 return True
         return False
     def conectar_dron(self, id, token):
-        if self.drones_conectados < numero_drones and self.verificar_dron(id, token):
+        print(self.drones_conectados)
+        
+        if self.drones_conectados < int(numero_drones) and self.verificar(id, token):
             self.drones_conectados += 1
             return True
         else:
+            print("false conectar")
             return False
 
 
@@ -244,27 +259,24 @@ if __name__ == "__main__":
     if len(sys.argv) != 5:
         print("Error de argumentos..")
         sys.exit(1)
-  
-    destinos = extraer_destinos("./fichero_destinos.txt")
-
-
-    
-    drones_autenticados = []
+    contador_conexiones = 0
         
-    for i in range(1, 61):
-        drone = Dron(identificador=i, posicion=(0,0))
-        drones_autenticados.append(drone)
-    print(len(drones_autenticados))
-
- 
+    motor = AD_Engine()  
+    puerto_escucha, numero_drones, ip_puerto_broker, ip_puerto_weather = sys.argv[1:5]
+    ip_weather, puerto_weather = separar_arg(ip_puerto_weather)
+    destinos = extraer_destinos("./fichero_destinos.txt")
+    #productor_kafka = KafkaProducer(bootstrap_servers=ip_puerto_broker, value_serializer=lambda x: dumps(x).encode('utf-8'))
+    iniciar_servidor(puerto_escucha, motor) 
+    
+   
+    entrada=input("Pulse enter para empezar el espectáculo")   
+    while entrada:
+        print("No pulsate la tecla enter...")
+        entrada = input("Pulse enter para empezar el espectáculo")
+        
     espacio = EspacioAereo(20, drones_autenticados)
-    print("\t\t EL ESPECTACULO COMIENZA...")
+    print("\t\t EL ESPECTÁCULO COMIENZA...")
     espacio.imprimir_mapa() 
     sleep(5)
     espacio.simulacion(destinos, drones_autenticados)
-    """"
-    puerto_escucha, numero_drones, ip_puerto_broker, ip_puerto_weather = sys.argv[1:5]
-    espacio = EspacioAereo(20, 20)
-    ip_weather, puerto_weather = separar_arg(ip_puerto_weather)
-    productor_kafka = KafkaProducer(bootstrap_servers=ip_puerto_broker, value_serializer=lambda x: dumps(x).encode('utf-8'))
-    """
+   

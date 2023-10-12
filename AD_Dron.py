@@ -82,7 +82,7 @@ class AD_Drone:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as servidor:
             servidor.connect((self.IP_Engine, self.Puerto_Engine))
             
-            data_token = f"<STX>{self.id},{self.toke}<ETX>"
+            data_token = f"<STX>{self.id},{self.token}<ETX>"
             data_token = data_token + calcular_lrc(data_token)
             servidor.send(data_token.encode())
             
@@ -97,7 +97,7 @@ class AD_Drone:
     
     
     def registrar(self):
-        #logica del registrar en AD_Registry
+        #logiºa del registrar en AD_Registry
         
             try:
                self.conectar_al_servidor()

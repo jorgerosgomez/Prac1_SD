@@ -47,7 +47,6 @@ def genera_token():
     return token
 def desencriptar_paquete(paquete):
    #COMPRUEBA QUE EXISTA EL STX
-    print(paquete)
     inicio = paquete.find("<STX>")
     if inicio == -1:
         print("STX no encontrado")
