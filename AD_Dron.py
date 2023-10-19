@@ -4,7 +4,7 @@ import json
 
 
 
-file_Dron= r'C:\Users\jorge\Desktop\uni\SD\Prac 1\Dron.json'
+file_Dron= 'Dron.json'
 
 def calcular_lrc(mensaje):
     bytes_mensaje = mensaje.encode('utf-8')
@@ -45,13 +45,15 @@ class AD_Drone:
     #CREAMOS LA CLASE DRON
     def __init__(self,id,Alias,IP_Engine , Puerto_Engine, IP_Broker , Puerto_Broker,IP_Registry , Puerto_Registry):
         self.Alias= Alias
-        self.id =  id
+        self.id =  id #id del dispositivo
         self.IP_Engine= IP_Engine
         self.Puerto_Engine= Puerto_Engine
         self.IP_Broker = IP_Broker
         self.Puerto_Broker= Puerto_Broker
         self.IP_Registry = IP_Registry
         self.Puerto_Registry= Puerto_Registry
+        self.posicion = (1, 1)  # Posición inicial
+    
     def conectar_al_servidor(self):
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as cliente_conexion:
@@ -75,7 +77,24 @@ class AD_Drone:
         except Exception as e:
             print(f"ERROR:  {e}")
     
-    
+    def unirse_espectaculo(self):
+        
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as servidor:
+            servidor.connect((self.IP_Engine, self.Puerto_Engine))
+            
+            data_token = f"<STX>{self.id},{self.token}<ETX>"
+            data_token = data_token + calcular_lrc(data_token)
+            servidor.send(data_token.encode())
+            
+            respuesta =  servidor.recv(1024).decode()
+            if respuesta == "<ACK>":
+                print("autenticacion correcta")
+            elif respuesta == "<NACK>":
+                print("error de autenticaion")
+            else:
+                print("Error por identificar")
+        
+             
     
     
     def registrar(self):
@@ -110,8 +129,8 @@ class AD_Drone:
        
             stx, etx = "<STX>","<ETX>"
             dato =  {
-                f"{id}":{
-                    "alias": f"{Alias}",
+                f"{self.id}":{
+                    "alias": f"{self.Alias}",
                     "token": None
                 }
             }   
@@ -126,6 +145,7 @@ class AD_Drone:
                 print("Mensaje enviado correctamente")
                 token = cliente_conexion.recv(1024).decode()
                 dato[f"{id}"]['token'] =  token
+                self.token = token
                 incluir_json(file_Dron,dato) 
                 cliente_conexion.close()
        
@@ -157,15 +177,17 @@ if __name__ == "__main__":
          # Crear una instancia de AD_Drone
         drone = AD_Drone(id,Alias, IP_Engine, Puerto_Engine, IP_Broker, Puerto_Broker, IP_Registry, Puerto_Registry)
         while True:
-            menu =input("Elige una de las opciones:\n" +"1-Registrar\n" + "2-Unirse al espectaculo\n"+ "3-Comprobar funcionamiento")
-            if (menu== '1'):
+            menu = input("Elige una de las opciones:\n" +
+                        "1-Registrar\n" +
+                        "2-Unirse al espectaculo\n" +
+                        "3-Comprobar funcionamiento\n" +
+                        "4-Salir\n-->")
+            if menu == '1':
                 drone.registrar()
-            elif (menu=='2'):
+            elif menu == '2':
                 drone.unirse_espectaculo()
-            elif(menu=='3'):
-                drone.funcionamiento()
+            elif menu == '3':
+                print("Saliendo...")
+                sys.exit(0)
             else:
-                print("Error de menu")
-                sys.exit(1)
-
-    
+                print("Error de menú")
