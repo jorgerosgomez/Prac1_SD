@@ -136,7 +136,7 @@ def registro(puerto):
         conexion.bind(("0.0.0.0", puerto))
         conexion.listen(50)
         #establecemos un tiempo de maximo en el que el servidor no tiene conxiones y si no las tiene lo cierra
-        conexion.settimeout(60)
+        conexion.settimeout(600)
 
 
         print(f"Escuchando en el puerto {puerto}...")
