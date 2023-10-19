@@ -7,9 +7,14 @@ WORKDIR /app
 # Instala las dependencias necesarias
 RUN pip install kafka-python
 
-# Copia el archivo AD_Engine.py al contenedor
+# Copia los archivos necesarios al contenedor
 COPY AD_Engine.py .
 COPY fichero_destinos.txt .
+COPY bd_Engine.json .
+COPY entrypoint.sh /entrypoint.sh
 
-# Comando para ejecutar cuando se inicie el contenedor
-CMD ["python", "./AD_Engine.py", "12:12", "21:12", "21:22", "21:12"]
+# Da permisos de ejecución al script de entrada
+RUN chmod +x /entrypoint.sh
+
+# Usa el script de entrada como punto de entrada
+ENTRYPOINT ["/entrypoint.sh"]

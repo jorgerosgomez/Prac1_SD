@@ -93,11 +93,12 @@ class AD_Drone:
                 print("error de autenticaion")
             else:
                 print("Error por identificar")
+        
              
     
     
     def registrar(self):
-        #logiºa del registrar en AD_Registry
+        #logica del registrar en AD_Registry
         
             try:
                self.conectar_al_servidor()
@@ -186,8 +187,6 @@ if __name__ == "__main__":
             elif menu == '2':
                 drone.unirse_espectaculo()
             elif menu == '3':
-                drone.funcionamiento()
-            elif menu == '4':
                 print("Saliendo...")
                 sys.exit(0)
             else:

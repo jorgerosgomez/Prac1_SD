@@ -8,9 +8,22 @@ import socket
 import re
 
 
-numero_drones = 100
+
 file_engine = 'bd_Engine.json'
 drones_autenticados =[]
+
+
+
+
+def enviar_posiciones(drones_autenticados): 
+    
+    for dron in drones_autenticados:
+        dron_id =  dron["id"]
+        dron_posicion = dron["posicion"]
+        serialized_position = f"{dron_posicion[0]},{dron_posicion[1]}".encode('utf-8')
+        nombre_topic =  f"dron_posicion_{dron_id}"
+        producer.send(nombre_topic,value=serialized_position)
+
 
 def calcular_lrc(mensaje):
     bytes_mensaje = mensaje.encode('utf-8')
@@ -160,23 +173,32 @@ class EspacioAereo:#CREAMOS LA CLASE ESPACIO AEREO DONDE SIMULAREMOS UN ESPACIO 
         GREEN = '\033[92m'
         RED = '\033[91m'
         END = '\033[0m'
-        #CREAMOS LAS VARIABLE DE COLOR PARA PODER PINTAR LOS DRONES SEGUN SE ESTAN MOVIENDO 
-        print('    ' + ' '.join([f"{i:02}" for i in range(self.dimension)]))
+        lines = []
+        lines.append('    ' + ' '.join([f"{i:02}" for i in range(self.dimension)]))
         for i in range(self.dimension):
-            line = []
+            line_elements = []
             for cell in self.mapa[i]:
                 if cell != ' ':
                     dron_id = int(cell)
                     if self.lista_drones[dron_id - 1].llego_a_destino:  # -1 porque la lista comienza en 0
-                        line.append(RED + cell + END)
-                    else: #DEPENDE SI EL DRON EN CUESTION DE LA LISTA LLEGO A SU DESTINO SE PINTARA DE UN COLOR  U OTRO
-                        line.append(GREEN + cell + END)
+                        line_elements.append(RED + cell + END)
+                    else:
+                        line_elements.append(GREEN + cell + END)
                 else:
-                    line.append(cell)
-            print(f"{i:02} | [" + "] [".join(line) + "] | " + f"{i:02}")
-        print('    ' + ' '.join([f"{i:02}" for i in range(self.dimension)]))
+                    line_elements.append(cell)
+            line = f"{i:02} | [" + "] [".join(line_elements) + "] | " + f"{i:02}"
+            lines.append(line)
+        lines.append('    ' + ' '.join([f"{i:02}" for i in range(self.dimension)]))
+        
+        full_map = '\n'.join(lines)
+        print(full_map)
+        clean_map = re.sub(r'\033\[\d+m', '', full_map)
+        producer.send('mapa', value=clean_map.encode('utf-8'))
+        
+    
 
     def obtener_destino(self, dron_id, destinos):# ESTA FUNCION NOS CALCULARA DELVUELVE LA POSCION DE DESTINO DE CADA DRON
+       
         for formacion, drones in destinos.items():
             for drone in drones:
                 if drone["id"] == dron_id:
@@ -194,17 +216,34 @@ class EspacioAereo:#CREAMOS LA CLASE ESPACIO AEREO DONDE SIMULAREMOS UN ESPACIO 
             if not dron.llego_a_destino:
                 return False
         return True
-    def simulacion(self, destinos, drones_autenticados):#HACE LA SIMULACION DEL ESPECTACULO
-        from time import sleep
+    def simulacion(self, destinos_completos, drones_autenticados):
+        for formacion_nombre in destinos_completos.keys():
+            input(f"pulse cualquier boton para comenzar con la figura: {formacion_nombre}")
+            print(f"Comenzando simulación para {formacion_nombre}...")
+            #reseteamos la variable de ha llegado a su destino de los drones
+            for dron in drones_autenticados:
+                dron.reset()    
+                        
+            destinos = {formacion_nombre: destinos_completos[formacion_nombre]}
             
-        while not self.todos_llegaron_a_destino(drones_autenticados):
-            self.mover_drones_hacia_destinos(destinos)
-            print("\nMapa después de mover:")
-            sleep(1)
-            self.imprimir_mapa()
+            
+            while not self.todos_llegaron_a_destino(drones_autenticados):
+                self.mover_drones_hacia_destinos(destinos)
+                enviar_posiciones(drones_autenticados)
+                    
+        
+                print("\nMapa después de mover:")
+                sleep(1)
+                self.imprimir_mapa()
+                
 
-        print("\nTodos los drones han llegado a su destino!")
+            print(f"\nTodos los drones han llegado a su destino para {formacion_nombre}!")
+        
+        print("\nSimulación completa para todas las formaciones!")
+        
+        producer.close()
         sys.exit(0)  # Termina el programa
+
 
 class Dron:
     def __init__(self, identificador, posicion):
@@ -224,6 +263,8 @@ class Dron:
 
         if tuple(self.posicion) == destino:
             self.llego_a_destino = True
+    def reset(self):
+        self.llego_a_destino =False
 
 class AD_Engine:
     
@@ -256,6 +297,8 @@ class AD_Engine:
 
 if __name__ == "__main__":
 
+    
+    """
     if len(sys.argv) != 5:
         print("Error de argumentos..")
         sys.exit(1)
@@ -265,7 +308,7 @@ if __name__ == "__main__":
     puerto_escucha, numero_drones, ip_puerto_broker, ip_puerto_weather = sys.argv[1:5]
     ip_weather, puerto_weather = separar_arg(ip_puerto_weather)
     destinos = extraer_destinos("./fichero_destinos.txt")
-    #productor_kafka = KafkaProducer(bootstrap_servers=ip_puerto_broker, value_serializer=lambda x: dumps(x).encode('utf-8'))
+    productor_kafka = KafkaProducer(bootstrap_servers=f'{ip_puerto_broker}', value_serializer=lambda x: x.encode('utf-8'))
     iniciar_servidor(puerto_escucha, motor) 
     
    
@@ -279,4 +322,18 @@ if __name__ == "__main__":
     espacio.imprimir_mapa() 
     sleep(5)
     espacio.simulacion(destinos, drones_autenticados)
-   
+    """
+    producer = KafkaProducer(bootstrap_servers='localhost:9092')
+    drones_autenticados = []
+    destinos = extraer_destinos("./fichero_destinos.txt")
+
+    for i in range(1, 5):  # i va desde 1 hasta 4
+        drone = Dron(i, (1, 1))
+        drones_autenticados.append(drone)
+    
+    espacio = EspacioAereo(20, drones_autenticados)
+    print("\t\t EL ESPECTÁCULO COMIENZA...")
+    espacio.imprimir_mapa() 
+    sleep(5)
+    espacio.simulacion(destinos, drones_autenticados)
+  
