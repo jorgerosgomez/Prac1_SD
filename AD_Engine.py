@@ -14,7 +14,7 @@ drones_autenticados =[]
 
 
 
-
+"""
 def enviar_posiciones(drones_autenticados): 
     
     for dron in drones_autenticados:
@@ -23,7 +23,7 @@ def enviar_posiciones(drones_autenticados):
         serialized_position = f"{dron_posicion[0]},{dron_posicion[1]}".encode('utf-8')
         nombre_topic =  f"dron_posicion_{dron_id}"
         producer.send(nombre_topic,value=serialized_position)
-
+"""
 
 def calcular_lrc(mensaje):
     bytes_mensaje = mensaje.encode('utf-8')
@@ -97,6 +97,7 @@ def extraer_destinos(ruta):
             })
 
         destinos[figura] = destinos_figura
+        
 
     return destinos
 
@@ -192,8 +193,8 @@ class EspacioAereo:#CREAMOS LA CLASE ESPACIO AEREO DONDE SIMULAREMOS UN ESPACIO 
         
         full_map = '\n'.join(lines)
         print(full_map)
-        clean_map = re.sub(r'\033\[\d+m', '', full_map)
-        producer.send('mapa', value=clean_map.encode('utf-8'))
+        #clean_map = re.sub(r'\033\[\d+m', '', full_map)
+        #producer.send('mapa', value=clean_map.encode('utf-8'))
         
     
 
@@ -229,7 +230,7 @@ class EspacioAereo:#CREAMOS LA CLASE ESPACIO AEREO DONDE SIMULAREMOS UN ESPACIO 
             
             while not self.todos_llegaron_a_destino(drones_autenticados):
                 self.mover_drones_hacia_destinos(destinos)
-                enviar_posiciones(drones_autenticados)
+                #enviar_posiciones(drones_autenticados)
                     
         
                 print("\nMapa después de mover:")
@@ -241,7 +242,8 @@ class EspacioAereo:#CREAMOS LA CLASE ESPACIO AEREO DONDE SIMULAREMOS UN ESPACIO 
         
         print("\nSimulación completa para todas las formaciones!")
         
-        producer.close()
+        #
+        #producer.close()
         sys.exit(0)  # Termina el programa
 
 
@@ -298,7 +300,7 @@ class AD_Engine:
 if __name__ == "__main__":
 
     
-    """
+    
     if len(sys.argv) != 5:
         print("Error de argumentos..")
         sys.exit(1)
@@ -308,7 +310,7 @@ if __name__ == "__main__":
     puerto_escucha, numero_drones, ip_puerto_broker, ip_puerto_weather = sys.argv[1:5]
     ip_weather, puerto_weather = separar_arg(ip_puerto_weather)
     destinos = extraer_destinos("./fichero_destinos.txt")
-    productor_kafka = KafkaProducer(bootstrap_servers=f'{ip_puerto_broker}', value_serializer=lambda x: x.encode('utf-8'))
+    #productor_kafka = KafkaProducer(bootstrap_servers=f'{ip_puerto_broker}', value_serializer=lambda x: x.encode('utf-8'))
     iniciar_servidor(puerto_escucha, motor) 
     
    
@@ -323,9 +325,10 @@ if __name__ == "__main__":
     sleep(5)
     espacio.simulacion(destinos, drones_autenticados)
     """
-    producer = KafkaProducer(bootstrap_servers='localhost:9092')
+    #producer = KafkaProducer(bootstrap_servers='localhost:9092')
     drones_autenticados = []
     destinos = extraer_destinos("./fichero_destinos.txt")
+    print(destinos)
 
     for i in range(1, 5):  # i va desde 1 hasta 4
         drone = Dron(i, (1, 1))
@@ -336,4 +339,4 @@ if __name__ == "__main__":
     espacio.imprimir_mapa() 
     sleep(5)
     espacio.simulacion(destinos, drones_autenticados)
-  
+    """
