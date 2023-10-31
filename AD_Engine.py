@@ -1,30 +1,55 @@
 from time import sleep
 import sys
-from kafka import KafkaProducer
+from kafka import KafkaProducer , KafkaConsumer
 from json import dumps
 import json
 import threading
 import socket
 import re
+import time
 
 
 
 file_engine = 'bd_Engine.json'
-drones_autenticados =[]
+condicion_drones = threading.Condition()
+drones_autenticados = []
 
 
+def verificar_drones_desconectados():
+    while True:
+        drones_a_eliminar = [drone for drone in drones_autenticados if drone.tiempo_sin_movimiento > 5]
+        for drone in drones_a_eliminar:
+            print(f"El dron con id {drone.identificador} ha perdido la conexión y se ha eliminado")
+            drones_autenticados.remove(drone)
+        time.sleep(1)  # verifica cada segundo si los drones no se han movido en 5 segundos
 
-"""
-def enviar_posiciones(drones_autenticados): 
+def inicializar_productor(broker_address):
+    return KafkaProducer(bootstrap_servers=broker_address, value_serializer=lambda v: json.dumps(v).encode('utf-8'))
+
+
+def inicializar_consumidor(topic, broker_address):
+    consumer = KafkaConsumer(
+        topic,
+        bootstrap_servers=broker_address,
+        value_deserializer=lambda x: json.loads(x.decode('utf-8'))
+    )
+    return consumer
+
+
+def leer_destinos(file_destinos):
     
-    for dron in drones_autenticados:
-        dron_id =  dron["id"]
-        dron_posicion = dron["posicion"]
-        serialized_position = f"{dron_posicion[0]},{dron_posicion[1]}".encode('utf-8')
-        nombre_topic =  f"dron_posicion_{dron_id}"
-        producer.send(nombre_topic,value=serialized_position)
-"""
-
+    
+    with open(file_destinos, 'r') as file:
+        try:
+            json_data = json.load(file)
+        except json.JSONDecodeError:
+            
+                json_data = {}
+    return json_data
+    
+    
+    
+    
 def calcular_lrc(mensaje):
     bytes_mensaje = mensaje.encode('utf-8')
     
@@ -67,39 +92,6 @@ def desempaquetar_string(paquete):
     # Devolver la DATA como una cadena
     return data
 
-def extraer_destinos(ruta):
-    with open(ruta, 'r') as file:
-        content = file.read()
-
-    #el patron busca cadenas que comiencen y terminen con una etiqueta (<TRIANGLE></TRIANGLE> ... )
-    # y que contengan conjuntos de tres numeros entre ellas.
-    pattern = r"<([A-Z]+)>\s*((?:<\d+><\d+><\d+>\s*)+)</\1>"
-
-    destinos = {}
-
-    for match in re.finditer(pattern, content):
-        
-         #extrae el nombre de la figura (por ejemplo, "TRIANGLE") de la coincidencia actual.
-        figura = match.group(1)
-        #extrae las coordenadas de la figura de la coincidencia actual.
-        #estas coordenadas estan entre las etiquetas de inicio y fin de la figura.
-        datos_bloque = content[match.start(2):match.end(2)]
-        coordenadas = re.findall(r"<(\d+)><(\d+)><(\d+)>", datos_bloque)
-        
-        destinos_figura = []
-        #itera sobre cada conjunto de coordenadas extraido
-        for coord in coordenadas:
-            #añade las coordenadas  a la lista
-            id_val, x_val, y_val = coord
-            destinos_figura.append({
-                "id": int(id_val),
-                "posicion": (int(x_val), int(y_val))
-            })
-
-        destinos[figura] = destinos_figura
-        
-
-    return destinos
 
 def escuchar_conexiones(servidor, ad_engine):
     while True:
@@ -120,6 +112,7 @@ def iniciar_servidor(puerto, ad_engine):
         
 def manejar_conexion(conexion,ad_engine):
     #recibir datos del cliente (en este caso, asumimos que recibes id y token como cadena)
+    global drones_autenticados, condicion_drones
     try:
         data = conexion.recv(1024).decode()
         data =desempaquetar_string(data)
@@ -132,7 +125,9 @@ def manejar_conexion(conexion,ad_engine):
         if ad_engine.conectar_dron(int(id_dron), token_dron):
             print( "Conexión exitosa")
             dron = Dron(identificador=int(id_dron),posicion=(0,0)) 
-            drones_autenticados.append(dron)
+            with condicion_drones:
+                drones_autenticados.append(dron)
+                condicion_drones.notify()
             conexion.send("<ACK>".encode())
         else:
             print("No se pudo conectar el dron")
@@ -149,124 +144,62 @@ def separar_arg(arg):
     parte=arg.split(':')
     return parte[0] , int(parte[1]) 
 
-
-class EspacioAereo:#CREAMOS LA CLASE ESPACIO AEREO DONDE SIMULAREMOS UN ESPACIO 2D
-    def __init__(self, dimension, lista_drones):#INICIALIZAMOS LA CLASE CON LAS VARIABLES
-        self.dimension = dimension #DIMENSION QUE SERA DxD
-        self.lista_drones = lista_drones #UNA LISTA DE DRONES QUE SERAN LOS DRONES PREVIAMENTE AUTENTICADOS
-        self.mapa = [[' ' for _ in range(dimension)] for _ in range(dimension)] #UNA VARIABLE MAPA
-        self.inicializar_mapa() #E INICIALIZAMOS CON LOS DRONES DENTRO QUE TENGAMOS EN NUESTRA LISTA DE DRONES AUTENTICADOS
-        
-    def inicializar_mapa(self):#INICIALIAR EL MAPA CONSISTE EN  MAPEAR EL MAPA COLOCANDO DRON EN LA POSICION QUE TOCA
-        for dron in self.lista_drones:
-            x, y = dron.posicion
-            if self.mapa[x][y] == ' ':
-                self.mapa[x][y] = str(dron.identificador) #EN LA POSCION DONDE HAY DRON SE ESCRIBIRA SU ID
-            else:
-                #SI HAY MAS DE UN DRON SERA EL ID CON MENOR NUMERO DE TODOS EL QUE APARECERA POR PANTALLA 
-                self.mapa[x][y] = str(min(int(self.mapa[x][y]), dron.identificador))
-                
-    def actualizar_mapa(self): #ACTUALIZAR EL MAPA CONSISTE EN RESFRESCAR EL MAPA YA QUE LOS DRONES HABRAN CAMBIADO DE POSICION 
-        self.mapa = [[' ' for _ in range(self.dimension)] for _ in range(self.dimension)]
-        self.inicializar_mapa()
+def pintar_mapa(drones_autenticados, dimension=20):
+    GREEN = '\033[92m'
+    RED = '\033[91m'
+    END = '\033[0m'
     
-    def imprimir_mapa(self):  #AQUI IMPRIMIMOS EL MAPA 
-        GREEN = '\033[92m'
-        RED = '\033[91m'
-        END = '\033[0m'
-        lines = []
-        lines.append('    ' + ' '.join([f"{i:02}" for i in range(self.dimension)]))
-        for i in range(self.dimension):
-            line_elements = []
-            for cell in self.mapa[i]:
-                if cell != ' ':
-                    dron_id = int(cell)
-                    if self.lista_drones[dron_id - 1].llego_a_destino:  # -1 porque la lista comienza en 0
-                        line_elements.append(RED + cell + END)
-                    else:
-                        line_elements.append(GREEN + cell + END)
+    # Convertir la lista de drones en un diccionario basado en el identificador del dron
+    drones_dict = {dron.identificador: dron for dron in drones_autenticados}
+    
+    # Crear un mapa inicial vacío
+    mapa = [[' ' for _ in range(dimension)] for _ in range(dimension)]
+    
+    for dron in drones_dict.values():
+        x, y = dron.posicion
+        if mapa[x][y] == ' ':
+            mapa[x][y] = str(dron.identificador) 
+        else:
+            # Si hay más de un dron en la misma posición, mostrar el dron con ID menor
+            mapa[x][y] = str(min(int(mapa[x][y]), dron.identificador))
+    
+    linea = []
+    linea.append('    ' + ' '.join([f"{i:02}" for i in range(dimension)]))
+    for i in range(dimension):
+        linea_elemento = []
+        for cell in mapa[i]:
+            if cell != ' ':
+                dron_id = int(cell)
+                if drones_dict[dron_id].llego_a_destino: 
+                    linea_elemento.append(GREEN + cell + END)
                 else:
-                    line_elements.append(cell)
-            line = f"{i:02} | [" + "] [".join(line_elements) + "] | " + f"{i:02}"
-            lines.append(line)
-        lines.append('    ' + ' '.join([f"{i:02}" for i in range(self.dimension)]))
-        
-        full_map = '\n'.join(lines)
-        print(full_map)
-        #clean_map = re.sub(r'\033\[\d+m', '', full_map)
-        #producer.send('mapa', value=clean_map.encode('utf-8'))
-        
+                    linea_elemento.append(RED + cell + END)
+            else:
+                linea_elemento.append(cell)
+        linea.append(f"{i:02} | [" + "] [".join(linea_elemento) + "] | " + f"{i:02}")
+    linea.append('    ' + ' '.join([f"{i:02}" for i in range(dimension)]))
     
-
-    def obtener_destino(self, dron_id, destinos):# ESTA FUNCION NOS CALCULARA DELVUELVE LA POSCION DE DESTINO DE CADA DRON
-       
-        for formacion, drones in destinos.items():
-            for drone in drones:
-                if drone["id"] == dron_id:
-                    return drone["posicion"]
-        return None
+    mapa = '\n'.join(linea)
+    print(mapa)
+    return mapa
     
-    def mover_drones_hacia_destinos(self, destinos):# ESTA FUNCION MUEVE LOS DRONES HACIA EL DESTINO QUE DEBEN IR Y ACTUALIZA EL MAPA
-        for dron in self.lista_drones:
-            destino = self.obtener_destino(dron.identificador, destinos)
-            if destino:
-                dron.mover_hacia_destino(destino)
-        self.actualizar_mapa()
-    def todos_llegaron_a_destino(self, drones): #COMPRUEBA SI TODOS LOS DRONES HAN LLEGADO AL DESTINO PARA ACABAR LA FUNCION Y SEGUIR CON LA SIGUIENTE FIGURA
-        for dron in drones:
-            if not dron.llego_a_destino:
-                return False
-        return True
-    def simulacion(self, destinos_completos, drones_autenticados):
-        for formacion_nombre in destinos_completos.keys():
-            input(f"pulse cualquier boton para comenzar con la figura: {formacion_nombre}")
-            print(f"Comenzando simulación para {formacion_nombre}...")
-            #reseteamos la variable de ha llegado a su destino de los drones
-            for dron in drones_autenticados:
-                dron.reset()    
-                        
-            destinos = {formacion_nombre: destinos_completos[formacion_nombre]}
-            
-            
-            while not self.todos_llegaron_a_destino(drones_autenticados):
-                self.mover_drones_hacia_destinos(destinos)
-                #enviar_posiciones(drones_autenticados)
-                    
-        
-                print("\nMapa después de mover:")
-                sleep(1)
-                self.imprimir_mapa()
-                
-
-            print(f"\nTodos los drones han llegado a su destino para {formacion_nombre}!")
-        
-        print("\nSimulación completa para todas las formaciones!")
-        
-        #
-        #producer.close()
-        sys.exit(0)  # Termina el programa
-
-
 class Dron:
     def __init__(self, identificador, posicion):
         self.identificador = identificador
         self.posicion = list(posicion)
         self.llego_a_destino = False
-        
-    def mover_hacia_destino(self, destino):
-        dx = destino[0] - self.posicion[0]
-        dy = destino[1] - self.posicion[1]
-        
-        if dx > 0: self.posicion[0] += 1
-        elif dx < 0: self.posicion[0] -= 1
+        self.ultimo_movimiento = None
+    def llego_destino(self):
+        self.llego_a_destino = True    
 
-        if dy > 0: self.posicion[1] += 1
-        elif dy < 0: self.posicion[1] -= 1
-
-        if tuple(self.posicion) == destino:
-            self.llego_a_destino = True
     def reset(self):
         self.llego_a_destino =False
+        self.posicion= list(0,0)#posible fallo
+    def actualizar_posicion(self, posicion):
+        self.posicion = list(map(int, posicion.split(',')))
+        self.ultimo_movimiento = time.time()
+    def tiempo_sin_movimiento(self):
+        return time.time() - self.ultimo_movimiento
 
 class AD_Engine:
     
@@ -305,25 +238,51 @@ if __name__ == "__main__":
         print("Error de argumentos..")
         sys.exit(1)
     contador_conexiones = 0
-        
+    file_destinos = "fichero_destinos.json"
     motor = AD_Engine()  
     puerto_escucha, numero_drones, ip_puerto_broker, ip_puerto_weather = sys.argv[1:5]
     ip_weather, puerto_weather = separar_arg(ip_puerto_weather)
-    destinos = extraer_destinos("./fichero_destinos.txt")
-    #productor_kafka = KafkaProducer(bootstrap_servers=f'{ip_puerto_broker}', value_serializer=lambda x: x.encode('utf-8'))
+    destinos = leer_destinos(file_destinos)
+    producer = inicializar_productor(ip_puerto_broker)
+    consumer = inicializar_consumidor('movimiento', ip_puerto_broker)
     iniciar_servidor(puerto_escucha, motor) 
+    numero_drones_figura = len(destinos["figuras"][0]["Drones"])
+    #esperamos que los drones necesarios se conecten desde el hilo 
+    with condicion_drones:
+        while len(drones_autenticados) < numero_drones_figura:
+            print("Esperando la conexion de drones necesarios para iniciar el espectaculo....")
+            condicion_drones.wait()
+    input("Se han conectado los drones necesarios, pulse cualquier tecla para iniciar el espectaculo")
+    threading.Thread(target=verificar_drones_desconectados).start()
+    threading.Thread(target=comprobar_clima).start()#por implementar
     
-   
-    entrada=input("Pulse enter para empezar el espectáculo")   
-    while entrada:
-        print("No pulsate la tecla enter...")
-        entrada = input("Pulse enter para empezar el espectáculo")
-        
-    espacio = EspacioAereo(20, drones_autenticados)
-    print("\t\t EL ESPECTÁCULO COMIENZA...")
-    espacio.imprimir_mapa() 
-    sleep(5)
-    espacio.simulacion(destinos, drones_autenticados)
+    for figura in destinos["figuras"]:
+        # Informa el inicio de la figura
+        print(f"Comenzando a formar la figura: {figura['Nombre']}")
+
+        # Manda la figura entera al broker destino
+        producer.send('destinos', figura)
+
+        # hasta que todos los drones no llegen a su destino de figura ...
+        while not all(drone.llego_a_destino for drone in drones_autenticados):
+            for posicion_actualizada in consumer:
+                for drone in drones_autenticados:
+                    if drone.identificador == posicion_actualizada["ID"]:
+                        drone.actualizar_posicion(posicion_actualizada['POS'])
+                        mapa = pintar_mapa(drones_autenticados)    
+                        producer.send('mapa', value=mapa.encode('utf-8'))
+                        break
+                if all(drone.llego_a_destino for drone in drones_autenticados):
+                    break                
+
+        # final de fig
+        print(f"Figura {figura['Nombre']} completada")
+        #Estaran con llega_A_destino en true
+        for dron in drones_autenticados:
+            dron.reset()
+    print("ha llegado el espectaculo al final")
+    producer.close()
+    consumer.close()
     """
     #producer = KafkaProducer(bootstrap_servers='localhost:9092')
     drones_autenticados = []
@@ -340,3 +299,6 @@ if __name__ == "__main__":
     sleep(5)
     espacio.simulacion(destinos, drones_autenticados)
     """
+    
+    
+  
