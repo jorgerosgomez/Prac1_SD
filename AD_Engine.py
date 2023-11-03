@@ -14,6 +14,10 @@ file_engine = 'bd_Engine.json'
 condicion_drones = threading.Condition()
 drones_autenticados = []
 
+# Configuración del servidor de clima
+clima_servidor = "AD_weather"
+clima_puerto = 12345  # El puerto del servidor de clima
+
 
 def verificar_drones_desconectados():
     while True:
@@ -22,6 +26,31 @@ def verificar_drones_desconectados():
             print(f"El dron con id {drone.identificador} ha perdido la conexión y se ha eliminado")
             drones_autenticados.remove(drone)
         time.sleep(1)  # verifica cada segundo si los drones no se han movido en 5 segundos
+
+# Función para consultar el servidor de clima
+def consultar_clima(clima_servidor):
+    while True:
+        try:
+            # Ciudad para consultar (reemplaza con la ciudad deseada)
+            ciudad = "madrid"
+            
+            # Crear una solicitud en formato JSON
+            solicitud = {"ciudad": ciudad}
+            clima_servidor.send(json.dumps(solicitud).encode())
+
+            # Recibir la respuesta del servidor de clima
+            respuesta = clima_servidor.recv(1024).decode()
+            datos_clima = json.loads(respuesta)
+            temperatura = datos_clima["temperatura"]
+
+            # Realizar acciones basadas en los datos del clima
+            if float(temperatura) > 35.0:
+                print(f"La temperatura en {ciudad} es alta ({temperatura}°C). Tomando medidas...")
+
+        except Exception as e:
+            print(f"Error al consultar el servidor de clima: {str(e)}")
+
+        time.sleep(60)  # Consulta cada 60 segundos
 
 def inicializar_productor(broker_address):
     return KafkaProducer(bootstrap_servers=broker_address, value_serializer=lambda v: json.dumps(v).encode('utf-8'))
@@ -254,7 +283,11 @@ if __name__ == "__main__":
             condicion_drones.wait()
     input("Se han conectado los drones necesarios, pulse cualquier tecla para iniciar el espectaculo")
     threading.Thread(target=verificar_drones_desconectados).start()
-    threading.Thread(target=comprobar_clima).start()#por implementar
+    
+    #conectarse al servidor de clima
+    clima_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    clima_socket.connect((clima_servidor, clima_puerto))
+    threading.Thread(target=consultar_clima, args=(clima_socket)).start()#por implementar
     
     for figura in destinos["figuras"]:
         # Informa el inicio de la figura
