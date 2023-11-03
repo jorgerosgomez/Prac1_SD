@@ -117,14 +117,28 @@ class AD_Drone:
                         while self.posicion != destino:
                             self.mover_drone(destino)
                             #leer un topic de kafka que sea error
+                            consumidor_2 = inicializar_consumidor('error_topic', IP_Puerto_Broker)
+                            for mensajes in consumidor_2:
+                                mensaje_texto = mensajes.value
+                                print(f"Mensaje de error recibido: {mensaje_texto}")
+                                destino= (1,1)
+                                while self.posicion != destino:
+                                    self.mover_drone(destino)
+                                print("Las condiciones son adversas volvemos a la base")
+                                exit(1)
+                            """
                             if error == True:
                                 destino= (1,1)
                                 while self.posicion != destino:
                                     self.mover_drone(destino)
                                 print("Las condiciones son adversas volvemos a la base") 
                                 exit(1)
+                           """
                         #leer topic mapa y print 
-                        
+                        consumidor_3 = inicializar_consumidor('mapa', IP_Puerto_Broker)
+                        for mensajes in consumidor_3:
+                            mapa = mensajes.value
+                            print(mapa)
                     
                     else:
                         print(f"No se encontro destino para el dron con id:{self.id}")

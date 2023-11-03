@@ -23,7 +23,7 @@ clima_puerto = 12345  # El puerto del servidor de clima
 
 def crecion_topics(administrador):
    #definimos los topics a crear
-    topics = ["destinos","movimientos","mapa"]
+    topics = ["destinos","movimientos","mapa","error_topic"]
     num_partitions = 1
     replication_factor = 1
     #hacemos una lista de topics 
@@ -322,7 +322,9 @@ if __name__ == "__main__":
             with flag_lock:
                 flag_actual = flag
             if flag_actual:
-                pass #mandar drones a base
+                mensaje_error = "Error."
+                producer.send('error_topic', value=mensaje_error.encode('utf-8'))
+                producer.close()
                 break 
                 
             for posicion_actualizada in consumer:
