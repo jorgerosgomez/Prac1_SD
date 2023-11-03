@@ -1,0 +1,89 @@
+  """
+class EspacioAereo:#CREAMOS LA CLASE ESPACIO AEREO DONDE SIMULAREMOS UN ESPACIO 2D
+    def __init__(self, dimension, lista_drones):#INICIALIZAMOS LA CLASE CON LAS VARIABLES
+        self.dimension = dimension #DIMENSION QUE SERA DxD
+        self.lista_drones = lista_drones #UNA LISTA DE DRONES QUE SERAN LOS DRONES PREVIAMENTE AUTENTICADOS
+        self.mapa = [[' ' for _ in range(dimension)] for _ in range(dimension)] #UNA VARIABLE MAPA
+        self.inicializar_mapa() #E INICIALIZAMOS CON LOS DRONES DENTRO QUE TENGAMOS EN NUESTRA LISTA DE DRONES AUTENTICADOS
+        
+    def inicializar_mapa(self):#INICIALIAR EL MAPA CONSISTE EN  MAPEAR EL MAPA COLOCANDO DRON EN LA POSICION QUE TOCA
+        for dron in self.lista_drones:
+            x, y = dron.posicion
+            if self.mapa[x][y] == ' ':
+                self.mapa[x][y] = str(dron.identificador) #EN LA POSCION DONDE HAY DRON SE ESCRIBIRA SU ID
+            else:
+                #SI HAY MAS DE UN DRON SERA EL ID CON MENOR NUMERO DE TODOS EL QUE APARECERA POR PANTALLA 
+                self.mapa[x][y] = str(min(int(self.mapa[x][y]), dron.identificador))
+                
+    def imprimir_mapa(self):  #AQUI IMPRIMIMOS EL MAPA 
+        GREEN = '\033[92m'
+        RED = '\033[91m'
+        END = '\033[0m'
+        lines = []
+        lines.append('    ' + ' '.join([f"{i:02}" for i in range(self.dimension)]))
+        for i in range(self.dimension):
+            line_elements = []
+            for cell in self.mapa[i]:
+                if cell != ' ':
+                    dron_id = int(cell)
+                    if self.lista_drones[dron_id - 1].llego_a_destino:  # -1 porque la lista comienza en 0
+                        line_elements.append(RED + cell + END)
+                    else:
+                        line_elements.append(GREEN + cell + END)
+                else:
+                    line_elements.append(cell)
+            line = f"{i:02} | [" + "] [".join(line_elements) + "] | " + f"{i:02}"
+            lines.append(line)
+        lines.append('    ' + ' '.join([f"{i:02}" for i in range(self.dimension)]))
+        
+        full_map = '\n'.join(lines)
+        print(full_map)
+        
+    def obtener_destino(self, dron_id, destinos):# ESTA FUNCION NOS CALCULARA DELVUELVE LA POSCION DE DESTINO DE CADA DRON
+       
+        for formacion, drones in destinos.items():
+            for drone in drones:
+                if drone["id"] == dron_id:
+                    return drone["posicion"]
+        return None
+    
+    def mover_drones_hacia_destinos(self, destinos):# ESTA FUNCION MUEVE LOS DRONES HACIA EL DESTINO QUE DEBEN IR Y ACTUALIZA EL MAPA
+        for dron in self.lista_drones:
+            destino = self.obtener_destino(dron.identificador, destinos)
+            if destino:
+                dron.mover_hacia_destino(destino)
+        self.actualizar_mapa()
+    def todos_llegaron_a_destino(self, drones): #COMPRUEBA SI TODOS LOS DRONES HAN LLEGADO AL DESTINO PARA ACABAR LA FUNCION Y SEGUIR CON LA SIGUIENTE FIGURA
+        for dron in drones:
+            if not dron.llego_a_destino:
+                return False
+        return True
+    def simulacion(self, destinos_completos, drones_autenticados):
+        for formacion_nombre in destinos_completos.keys():
+            input(f"pulse cualquier boton para comenzar con la figura: {formacion_nombre}")
+            print(f"Comenzando simulación para {formacion_nombre}...")
+            #reseteamos la variable de ha llegado a su destino de los drones
+            for dron in drones_autenticados:
+                dron.reset()    
+                        
+            destinos = {formacion_nombre: destinos_completos[formacion_nombre]}
+            
+            
+            while not self.todos_llegaron_a_destino(drones_autenticados):
+                self.mover_drones_hacia_destinos(destinos)
+                #enviar_posiciones(drones_autenticados)
+                    
+        
+                print("\nMapa después de mover:")
+                sleep(1)
+                self.imprimir_mapa()
+                
+
+            print(f"\nTodos los drones han llegado a su destino para {formacion_nombre}!")
+        
+        print("\nSimulación completa para todas las formaciones!")
+        
+        #
+        #producer.close()
+        sys.exit(0)  # Termina el programa
+    """
