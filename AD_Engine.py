@@ -1,6 +1,7 @@
 from time import sleep
 import sys
 from kafka import KafkaProducer , KafkaConsumer
+from kafka.admin import KafkaAdminClient, NewTopic
 from json import dumps
 import json
 import threading
@@ -14,6 +15,16 @@ file_engine = 'bd_Engine.json'
 condicion_drones = threading.Condition()
 drones_autenticados = []
 
+
+def crecion_topics(administrador):
+   #definimos los topics a crear
+    topics = ["destinos","movimientos","mapa"]
+    num_partitions = 1
+    replication_factor = 1
+    #hacemos una lista de topics 
+    topic_nuevo =   [NewTopic(name=topic, num_partitions=num_partitions, replication_factor=replication_factor) for topic in topics]
+    #los creamos mediante la instacia de administrador de kafka_admin
+    administrador.create_topics(new_topics=topic_nuevo, validate_only=False)
 
 def verificar_drones_desconectados():
     while True:
@@ -237,11 +248,16 @@ if __name__ == "__main__":
     if len(sys.argv) != 5:
         print("Error de argumentos..")
         sys.exit(1)
+        
+       
+        
     contador_conexiones = 0
     file_destinos = "fichero_destinos.json"
     motor = AD_Engine()  
     puerto_escucha, numero_drones, ip_puerto_broker, ip_puerto_weather = sys.argv[1:5]
     ip_weather, puerto_weather = separar_arg(ip_puerto_weather)
+    administrador  = KafkaAdminClient(bootstrap_servers = ip_puerto_broker)
+    crecion_topics(administrador) 
     destinos = leer_destinos(file_destinos)
     producer = inicializar_productor(ip_puerto_broker)
     consumer = inicializar_consumidor('movimiento', ip_puerto_broker)
@@ -281,6 +297,8 @@ if __name__ == "__main__":
         for dron in drones_autenticados:
             dron.reset()
     print("ha llegado el espectaculo al final")
+    topic_borrar = ["destinos", "movimientos","mapa"]
+    administrador.delete_topics(topic_borrar)
     producer.close()
     consumer.close()
     """
