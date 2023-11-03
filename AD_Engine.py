@@ -3,6 +3,7 @@ import sys
 from kafka import KafkaProducer , KafkaConsumer
 from kafka.admin import KafkaAdminClient, NewTopic
 from json import dumps
+from threading import Lock
 import json
 import threading
 import socket
@@ -39,7 +40,7 @@ def verificar_drones_desconectados():
         time.sleep(1)  # verifica cada segundo si los drones no se han movido en 5 segundos
 
 # Función para consultar el servidor de clima
-def consultar_clima(clima_servidor):
+def consultar_clima(clima_servidor,flag):
     while True:
         try:
             # Ciudad para consultar (reemplaza con la ciudad deseada)
@@ -55,13 +56,15 @@ def consultar_clima(clima_servidor):
             temperatura = datos_clima["temperatura"]
 
             # Realizar acciones basadas en los datos del clima
-            if float(temperatura) > 35.0:
-                print(f"La temperatura en {ciudad} es alta ({temperatura}°C). Tomando medidas...")
+            if float(temperatura) <= 0.0:
+                with flag_lock:
+                    flag == True
 
         except Exception as e:
             print(f"Error al consultar el servidor de clima: {str(e)}")
 
-        time.sleep(60)  # Consulta cada 60 segundos
+        time.sleep(5)  # Consulta cada 60 segundos
+    
 
 def inicializar_productor(broker_address):
     return KafkaProducer(bootstrap_servers=broker_address, value_serializer=lambda v: json.dumps(v).encode('utf-8'))
@@ -282,6 +285,8 @@ if __name__ == "__main__":
         
     contador_conexiones = 0
     file_destinos = "fichero_destinos.json"
+    flag = False
+    flag_lock =  Lock()
     motor = AD_Engine()  
     puerto_escucha, numero_drones, ip_puerto_broker, ip_puerto_weather = sys.argv[1:5]
     ip_weather, puerto_weather = separar_arg(ip_puerto_weather)
@@ -314,13 +319,19 @@ if __name__ == "__main__":
 
         # hasta que todos los drones no llegen a su destino de figura ...
         while not all(drone.llego_a_destino for drone in drones_autenticados):
+            with flag_lock:
+                flag_actual = flag
+            if flag_actual:
+                pass #mandar drones a base
+                break 
+                
             for posicion_actualizada in consumer:
                 for drone in drones_autenticados:
-                    if drone.identificador == posicion_actualizada["ID"]:
-                        drone.actualizar_posicion(posicion_actualizada['POS'])
-                        mapa = pintar_mapa(drones_autenticados)    
-                        producer.send('mapa', value=mapa.encode('utf-8'))
-                        break
+                    if drone.identificador == posicion_actualizada["ID"] :
+                            drone.actualizar_posicion(posicion_actualizada['POS'])
+                            mapa = pintar_mapa(drones_autenticados)    
+                            producer.send('mapa', value=mapa.encode('utf-8'))
+                            break
                 if all(drone.llego_a_destino for drone in drones_autenticados):
                     break                
 
@@ -334,6 +345,7 @@ if __name__ == "__main__":
     administrador.delete_topics(topic_borrar)
     producer.close()
     consumer.close()
+    clima_socket.close()
     """
     #producer = KafkaProducer(bootstrap_servers='localhost:9092')
     drones_autenticados = []

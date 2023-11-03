@@ -41,42 +41,32 @@ figura = data['figuras'][0]  # Supongo que solo hay una figura en tu archivo
 drones = figura['Drones']
 
 # Función para mover un dron a su siguiente posición adyacente
-def move_drone(dron):
-    x, y = 1, 1  # Posición inicial
-    x_final, y_final = map(int, dron['POS'].split(','))
-    while (x, y) != (x_final, y_final):
-        if x < x_final and y < y_final:
-            x += 1
-            y += 1
-        elif x > x_final and y > y_final:
-            x -= 1
-            y -= 1
-        elif x > x_final and y == y_final:
-            x += 1
-        elif x > x_final and y == y_final:
-            x -= 1
-        elif x == x_final and y < y_final:
-            y += 1
-        elif x == x_final and y > y_final:
-            y -= 1
-        elif x < x_final and y > y_final:
-            x =+ 1
-            y -= 1
-        elif x > x_final and y < y_final:
-            x -= 1
-
-            y += 1
-        dron['POS'] = f"{x},{y}"
+def move_drone(self, destino):
+    x_actual , y_actual = self.posicion
+    x_final, y_final = map(int, destino['POS'].split(','))
+    while (x_actual, y_actual) != (x_final, y_final):
+        if x_actual < x_final:
+            x_actual += 1
+        elif x_actual > x_final:
+            x_actual -= 1
+                
+        if y_actual < y_final:
+            y_actual += 1
+        elif y_actual > y_final:
+            y_actual -= 1
+        
+        self.posicion = (x_actual,y_actual)
+       
+        
         time.sleep(1)  # Esperar un segundo entre cada movimiento
         # Publicar la ubicación en Kafka
         topic = 'movimientos'
         payload = {
-            'ID': dron['ID'],
-            'POS': dron['POS']
+            'ID': self.id,
+            'POS': f"{x_actual},{y_actual}"
         }
-        producer.produce(topic, key=str(dron['ID']), value=json.dumps(payload))
-        producer.flush()
-        print(f"Dron {dron['ID']} se mueve a {dron['POS']}")
+        producer.produce(topic, value=json.dumps(payload))
+        print(f"Dron {self.id} se mueve a {x_actual},{y_actual}")
 
 # Mover los drones uno por uno
 for dron in drones:
