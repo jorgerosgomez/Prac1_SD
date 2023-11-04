@@ -7,7 +7,6 @@ from threading import Lock
 import json
 import threading
 import socket
-import re
 import time
 
 
@@ -15,13 +14,14 @@ import time
 file_engine = 'bd_Engine.json'
 condicion_drones = threading.Condition()
 drones_autenticados = []
+GREEN = '\033[92m'
+RED = '\033[91m'
+END = '\033[0m'
 
-# Configuración del servidor de clima
-clima_servidor = "AD_weather"
-clima_puerto = 12345  # El puerto del servidor de clima
 
 
-def crecion_topics(administrador):
+
+def creacion_topics(administrador):
    #definimos los topics a crear
     topics = ["destinos","movimientos","mapa","error_topic"]
     num_partitions = 1
@@ -33,14 +33,14 @@ def crecion_topics(administrador):
 
 def verificar_drones_desconectados():
     while True:
-        drones_a_eliminar = [drone for drone in drones_autenticados if drone.tiempo_sin_movimiento > 5]
+        drones_a_eliminar = [drone for drone in drones_autenticados if drone.tiempo_sin_movimiento() > 5]
         for drone in drones_a_eliminar:
             print(f"El dron con id {drone.identificador} ha perdido la conexión y se ha eliminado")
             drones_autenticados.remove(drone)
         time.sleep(1)  # verifica cada segundo si los drones no se han movido en 5 segundos
 
 # Función para consultar el servidor de clima
-def consultar_clima(clima_servidor,flag):
+def consultar_clima(clima_servidor,flag, flag_lock):
     while True:
         try:
             # Ciudad para consultar (reemplaza con la ciudad deseada)
@@ -58,16 +58,19 @@ def consultar_clima(clima_servidor,flag):
             # Realizar acciones basadas en los datos del clima
             if float(temperatura) <= 0.0:
                 with flag_lock:
-                    flag == True
+                    flag[0] = True
 
         except Exception as e:
             print(f"Error al consultar el servidor de clima: {str(e)}")
+            with flag_lock:
+                flag[0] = True
+            break
 
-        time.sleep(5)  # Consulta cada 60 segundos
+        time.sleep(5)  # Consulta cada 5 segundos
     
 
 def inicializar_productor(broker_address):
-    return KafkaProducer(bootstrap_servers=broker_address, value_serializer=lambda v: json.dumps(v).encode('utf-8'))
+    return KafkaProducer(bootstrap_servers=broker_address)
 
 
 def inicializar_consumidor(topic, broker_address):
@@ -188,9 +191,7 @@ def separar_arg(arg):
     return parte[0] , int(parte[1]) 
 
 def pintar_mapa(drones_autenticados, dimension=20):
-    GREEN = '\033[92m'
-    RED = '\033[91m'
-    END = '\033[0m'
+
     
     # Convertir la lista de drones en un diccionario basado en el identificador del dron
     drones_dict = {dron.identificador: dron for dron in drones_autenticados}
@@ -231,18 +232,25 @@ class Dron:
         self.identificador = identificador
         self.posicion = list(posicion)
         self.llego_a_destino = False
-        self.ultimo_movimiento = None
+        self.ultimo_movimiento = 0.0
     def llego_destino(self):
         self.llego_a_destino = True    
 
     def reset(self):
         self.llego_a_destino =False
-        self.posicion= list(0,0)#posible fallo
+        self.posicion= [0,0]#posible fallo
     def actualizar_posicion(self, posicion):
         self.posicion = list(map(int, posicion.split(',')))
         self.ultimo_movimiento = time.time()
     def tiempo_sin_movimiento(self):
-        return time.time() - self.ultimo_movimiento
+        if self.ultimo_movimiento is None:
+            # Manejar adecuadamente si ultimo_movimiento es None
+            # Por ejemplo, puedes inicializarlo con el tiempo actual
+            self.ultimo_movimiento = time.time()
+            return 0
+        else:
+            return time.time() - self.ultimo_movimiento
+
 
 class AD_Engine:
     
@@ -285,13 +293,17 @@ if __name__ == "__main__":
         
     contador_conexiones = 0
     file_destinos = "fichero_destinos.json"
-    flag = False
+    flag = [False]
     flag_lock =  Lock()
     motor = AD_Engine()  
     puerto_escucha, numero_drones, ip_puerto_broker, ip_puerto_weather = sys.argv[1:5]
     ip_weather, puerto_weather = separar_arg(ip_puerto_weather)
     administrador  = KafkaAdminClient(bootstrap_servers = ip_puerto_broker)
-    crecion_topics(administrador) 
+    try:
+        creacion_topics(administrador) 
+    except Exception as e:
+        print(f"No se han creado los topics porque ya existen")
+        
     destinos = leer_destinos(file_destinos)
     producer = inicializar_productor(ip_puerto_broker)
     consumer = inicializar_consumidor('movimiento', ip_puerto_broker)
@@ -307,20 +319,20 @@ if __name__ == "__main__":
     
     #conectarse al servidor de clima
     clima_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    clima_socket.connect((clima_servidor, clima_puerto))
-    threading.Thread(target=consultar_clima, args=(clima_socket)).start()#por implementar
+    clima_socket.connect((ip_weather, puerto_weather))
+    threading.Thread(target=consultar_clima, args=(clima_socket,flag,flag_lock)).start()#por implementar
     
     for figura in destinos["figuras"]:
         # Informa el inicio de la figura
         print(f"Comenzando a formar la figura: {figura['Nombre']}")
 
         # Manda la figura entera al broker destino
-        producer.send('destinos', figura)
+        producer.send('destinos', json.dumps(figura).encode('utf-8'))
 
         # hasta que todos los drones no llegen a su destino de figura ...
         while not all(drone.llego_a_destino for drone in drones_autenticados):
             with flag_lock:
-                flag_actual = flag
+                flag_actual = flag[0]
             if flag_actual:
                 mensaje_error = "Error."
                 producer.send('error_topic', value=mensaje_error.encode('utf-8'))
@@ -344,26 +356,14 @@ if __name__ == "__main__":
             dron.reset()
     print("ha llegado el espectaculo al final")
     topic_borrar = ["destinos", "movimientos","mapa"]
-    administrador.delete_topics(topic_borrar)
-    producer.close()
-    consumer.close()
-    clima_socket.close()
-    """
-    #producer = KafkaProducer(bootstrap_servers='localhost:9092')
-    drones_autenticados = []
-    destinos = extraer_destinos("./fichero_destinos.txt")
-    print(destinos)
+    try:
+        administrador.delete_topics(topic_borrar)
+        producer.close()
+        consumer.close()
+        clima_socket.close()
+    except Exception as e:
+        print(f"Error : {e}")
 
-    for i in range(1, 5):  # i va desde 1 hasta 4
-        drone = Dron(i, (1, 1))
-        drones_autenticados.append(drone)
-    
-    espacio = EspacioAereo(20, drones_autenticados)
-    print("\t\t EL ESPECTÁCULO COMIENZA...")
-    espacio.imprimir_mapa() 
-    sleep(5)
-    espacio.simulacion(destinos, drones_autenticados)
-    """
     
     
   

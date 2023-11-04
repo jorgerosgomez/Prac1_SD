@@ -9,17 +9,36 @@ from kafka import KafkaConsumer,KafkaProducer
 file_Dron= 'Dron.json'
 
 
+
+
+config_destinos = {
+    'auto_offset_reset': 'earliest',
+    'enable_auto_commit': True,
+    'value_deserializer': lambda m: json.loads(m.decode('utf-8'))
+}
+config_mapa={
+    'auto_offset_reset': 'lastest',
+    'enable_auto_commit': False,
+    
+}
+
 def inicializar_productor(broker_address):
     return KafkaProducer(bootstrap_servers=broker_address, value_serializer=lambda v: json.dumps(v).encode('utf-8'))
 
-def inicializar_consumidor(topic, broker_address):
-    consumer = KafkaConsumer(
-        topic,
-        bootstrap_servers=broker_address,
-        value_deserializer=lambda x: json.loads(x.decode('utf-8')),
-    )
-    return consumer
+def inicializar_consumidor(topic_name, broker_address, consumer_config=None):
+    if consumer_config is None:
+        consumer_config = {}
 
+    # Configuracion
+    default_config = {
+        'bootstrap_servers': broker_address
+    }
+
+    final_config = {**default_config, **consumer_config}
+
+    # Inicializar el consumidor con la configuración final
+    consumer = KafkaConsumer(topic_name, **final_config)
+    return consumer
 def calcular_lrc(mensaje):
     bytes_mensaje = mensaje.encode('utf-8')
     
@@ -101,15 +120,14 @@ class AD_Drone:
             respuesta =  servidor.recv(1024).decode()
             if respuesta == "<ACK>":
                 print("autenticacion correcta")
-                consumer =inicializar_consumidor('destinos',IP_Puerto_Broker)
-                for mensajes in consumer:
+                consumer_destino =inicializar_consumidor('destinos',IP_Puerto_Broker,config_destinos)
+                for mensajes in consumer_destino:
                     # Procesa el primer mensaje recibido y luego rompe el bucle
                     destinos =  mensajes.value
-                    consumer.close()  # Cierra el consumidor después de procesar el primer mensaje
                     break
                 for drones in destinos["Drones"]:
                     if drones["ID"]== self.id:
-                        destino = tuple(map(int, drone["POS"].split(',')))
+                        destino = tuple(map(int, drones["POS"].split(',')))
                         print(f"El dron con ID {self.id} debe moverse a la posición {destino}")
                         #logica para moverse 
                         #self.posicion --> destino # cada vez que se mueva mandar un mensaje al topic movimiento
@@ -117,28 +135,22 @@ class AD_Drone:
                         while self.posicion != destino:
                             self.mover_drone(destino)
                             #leer un topic de kafka que sea error
-                            consumidor_2 = inicializar_consumidor('error_topic', IP_Puerto_Broker)
-                            for mensajes in consumidor_2:
-                                mensaje_texto = mensajes.value
+                            consumer_error= inicializar_consumidor('error_topic', IP_Puerto_Broker)
+                            for mensajes in consumer_error:
+                                mensaje_texto = mensajes.value.decode('utf-8')
                                 print(f"Mensaje de error recibido: {mensaje_texto}")
                                 destino= (1,1)
                                 while self.posicion != destino:
                                     self.mover_drone(destino)
                                 print("Las condiciones son adversas volvemos a la base")
-                                exit(1)
-                            """
-                            if error == True:
-                                destino= (1,1)
-                                while self.posicion != destino:
-                                    self.mover_drone(destino)
-                                print("Las condiciones son adversas volvemos a la base") 
-                                exit(1)
-                           """
+                                sys.exit(1)
+
                         #leer topic mapa y print 
-                        consumidor_3 = inicializar_consumidor('mapa', IP_Puerto_Broker)
-                        for mensajes in consumidor_3:
+                        consumer_mapa = inicializar_consumidor('mapa', IP_Puerto_Broker,config_mapa)
+                        for mensajes in consumer_mapa:
                             mapa = mensajes.value
                             print(mapa)
+                        break
                     
                     else:
                         print(f"No se encontro destino para el dron con id:{self.id}")
@@ -265,14 +277,13 @@ if __name__ == "__main__":
             menu = input("Elige una de las opciones:\n" +
                         "1-Registrar\n" +
                         "2-Unirse al espectaculo\n" +
-                        "3-Comprobar funcionamiento\n" +
-                        "4-Salir\n-->")
+                        "3-Salir\n-->")
             if menu == '1':
                 drone.registrar()
             elif menu == '2':
                 drone.unirse_espectaculo()
             elif menu == '3':
                 print("Saliendo...")
-                sys.exit(0)
+                break
             else:
                 print("Error de menú")

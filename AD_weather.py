@@ -5,55 +5,61 @@ import json
 
 ruta = "bd_Clima.json"
 
-# Función para iniciar el servidor en un puerto específico
-def iniciar_servidor(puerto):
-
-    # Crear un socket y enlazarlo al puerto especificado
-    servidor = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-    servidor.bind(("localhost", int(puerto)))
-    servidor.listen(1) 
-    print(f"Esperando conexion en el puerto {puerto}...")   
-
-    while True:
-        conn, addr = servidor.accept() # Aceptar una nueva conexión
-        print(f"Conexión establecida desde {addr}")
-
-        # Recibir datos de la conexión
-        data = conn.recv(1024).decode()
-        ciudad = json.loads(data)["ciudad"]
-
-        #Cargar datos desde la base de datos
-        datos = guardar_json()
-
-        #Buscar la temperatura de la ciudad solicitada
-        if ciudad in datos:
-            temperatura = datos[ciudad]
-            respuesta = {"ciudad": ciudad, "temperatura": temperatura}
-        else:
-            respuesta = {"ciudad": ciudad, "temperatura": "Desconocida"}
+def ejecutar_servidor(puerto):
     
-        #Enviar respuesta a engine
-        conn.send(json.dumps(respuesta).encode())
-        conn.close
+    servidor = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    servidor.bind(("localhost", int(puerto)))
+    servidor.listen(1)
+    print(f"Esperando conexión en el puerto {puerto}...")
 
-#Funcion para cargar datos desde un archivo JSON
-def guardar_json():
+    # Aceptar una nueva conexión
+    conn, addr = servidor.accept()
+    print(f"Conexión establecida desde {addr}")
+
+    try:
+        while True:
+            data = conn.recv(1024).decode()
+            if not data:
+                break  # Si no hay datos, el cliente se desconectó
+
+            ciudad = json.loads(data)["ciudad"]
+            datos = cargar_datos_clima()
+
+            temperatura = datos.get(ciudad, {"temperatura": 15})["temperatura"]
+            respuesta = {"ciudad": ciudad, "temperatura": temperatura}
+            
+            conn.send(json.dumps(respuesta).encode())
+
+    except Exception as e:
+        print(f"Error: {e}")
+    finally:
+        conn.close()
+        servidor.close()
+
+        
+
+def cargar_datos_clima():
     with open(ruta, "r") as file:
         try:
             datos = json.load(file)
         except json.JSONDecodeError:
             datos = {}
-            print("Error JSON vacío")
+            print("Error: El archivo JSON está vacío o tiene un formato incorrecto.")
     return datos
 
-if __name__ == "__main":
+
+
+if __name__=="__main__":
+    
+    
+    
     if len(sys.argv) != 2:
-        print("Error: parámetros incorrectos")
-        sys.exit(1)
-
+        print( "Error parametros incorrectos")
+    
     puerto = sys.argv[1]
-
-    # Iniciar el servidor en el puerto especificado
-    iniciar_servidor(puerto)
+    ejecutar_servidor(puerto)
+    
+    
+    
     
    
