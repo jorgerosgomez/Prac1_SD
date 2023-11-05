@@ -5,37 +5,61 @@ import json
 
 ruta = "bd_Clima.json"
 
-def iniciar_servidor(puerto):
-
-    servidor = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+def ejecutar_servidor(puerto):
+    
+    servidor = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     servidor.bind(("localhost", int(puerto)))
-    servidor.listen(1) 
-    print(f"Esperando conexion en el puerto {puerto}...")   
+    servidor.listen(1)
+    print(f"Esperando conexión en el puerto {puerto}...")
 
-def guardar_json():
-    
-    
-    with open(ruta,"r") as file:
+    # Aceptar una nueva conexión
+    conn, addr = servidor.accept()
+    print(f"Conexión establecida desde {addr}")
+
+    try:
+        while True:
+            data = conn.recv(1024).decode()
+            if not data:
+                break  # Si no hay datos, el cliente se desconectó
+
+            ciudad = json.loads(data)["ciudad"]
+            datos = cargar_datos_clima()
+
+            temperatura = datos.get(ciudad, {"temperatura": 15})["temperatura"]
+            respuesta = {"ciudad": ciudad, "temperatura": temperatura}
+            
+            conn.send(json.dumps(respuesta).encode())
+
+    except Exception as e:
+        print(f"Error: {e}")
+    finally:
+        conn.close()
+        servidor.close()
+
+        
+
+def cargar_datos_clima():
+    with open(ruta, "r") as file:
         try:
             datos = json.load(file)
         except json.JSONDecodeError:
-            datos= {}
-            print("Error JSON vacio")
+            datos = {}
+            print("Error: El archivo JSON está vacío o tiene un formato incorrecto.")
     return datos
-
 
 
 
 if __name__=="__main__":
     
     
-
     
     if len(sys.argv) != 2:
         print( "Error parametros incorrectos")
     
     puerto = sys.argv[1]
-    datos =  guardar_json() 
-    iniciar_servidor(puerto)
+    ejecutar_servidor(puerto)
+    
+    
+    
     
    
