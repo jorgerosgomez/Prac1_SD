@@ -306,7 +306,7 @@ if __name__ == "__main__":
         
     destinos = leer_destinos(file_destinos)
     producer = inicializar_productor(ip_puerto_broker)
-    consumer = inicializar_consumidor('movimiento', ip_puerto_broker)
+    consumer = inicializar_consumidor('movimientos', ip_puerto_broker)
     iniciar_servidor(puerto_escucha, motor) 
     numero_drones_figura = len(destinos["figuras"][0]["Drones"])
     #esperamos que los drones necesarios se conecten desde el hilo 

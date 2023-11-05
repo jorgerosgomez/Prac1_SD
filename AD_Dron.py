@@ -2,6 +2,7 @@ import socket
 import sys
 import json
 import time
+from time import sleep
 from kafka import KafkaConsumer,KafkaProducer
 
 
@@ -12,7 +13,6 @@ file_Dron= 'Dron.json'
 
 
 config_destinos = {
-    'auto_offset_reset': 'lastest',
     'enable_auto_commit': True,
     'value_deserializer': lambda m: json.loads(m.decode('utf-8'))
 }
@@ -121,22 +121,18 @@ class AD_Drone:
             if respuesta == "<ACK>":
                 print("autenticacion correcta")
                 consumer_destino =inicializar_consumidor('destinos',IP_Puerto_Broker,config_destinos)
-                consumer_destino = consumer_destino.subscribe(['destinos'])
-                while True:
-                    try:
-                        for mensajes in consumer_destino:
-                            print("entra")
+               
+                for mensajes in consumer_destino:
+                    
                             # Procesa el primer mensaje recibido y luego rompe el bucle
-                            destinos =  mensajes.value
-                            break
-                        break
-                    except Exception as e:
-                        
-                        continue
+                    destinos =  mensajes.value
+                    break
+                       
                     
                 for drones in destinos["Drones"]:
                     if drones["ID"]== self.id:
                         destino = tuple(map(int, drones["POS"].split(',')))
+                 
                         print(f"El dron con ID {self.id} debe moverse a la posición {destino}")
                         #logica para moverse 
                         #self.posicion --> destino # cada vez que se mueva mandar un mensaje al topic movimiento
@@ -145,21 +141,23 @@ class AD_Drone:
                             self.mover_drone(destino)
                             #leer un topic de kafka que sea error
                             consumer_error= inicializar_consumidor('error_topic', IP_Puerto_Broker)
-                            for mensajes in consumer_error:
-                                mensaje_texto = mensajes.value.decode('utf-8')
-                                print(f"Mensaje de error recibido: {mensaje_texto}")
-                                destino= (1,1)
-                                while self.posicion != destino:
-                                    self.mover_drone(destino)
-                                print("Las condiciones son adversas volvemos a la base")
-                                sys.exit(1)
-
+                            try:
+                                for mensajes in consumer_error:
+                                    mensaje_texto = mensajes.value.decode('utf-8')
+                                    print(f"Mensaje de error recibido: {mensaje_texto}")
+                                    destino= (1,1)
+                                    while self.posicion != destino:
+                                        self.mover_drone(destino)
+                                    print("Las condiciones son adversas volvemos a la base")
+                                    sys.exit(1)
+                            except Exception:
+                                
                         #leer topic mapa y print 
-                        consumer_mapa = inicializar_consumidor('mapa', IP_Puerto_Broker,config_mapa)
-                        for mensajes in consumer_mapa:
-                            mapa = mensajes.value
-                            print(mapa)
-                        break
+                                consumer_mapa = inicializar_consumidor('mapa', IP_Puerto_Broker,config_mapa)
+                                for mensajes in consumer_mapa:
+                                    mapa = mensajes.value
+                                    print(mapa)
+                                break
                     
                     else:
                         print(f"No se encontro destino para el dron con id:{self.id}")
@@ -175,7 +173,7 @@ class AD_Drone:
    
     def mover_drone(self, destino):
         x_actual , y_actual = self.posicion
-        x_final, y_final =  destino['POS']
+        x_final, y_final =  destino
            
         if x_actual < x_final:
             x_actual += 1
@@ -192,12 +190,12 @@ class AD_Drone:
             
         time.sleep(1)  # Esperar un segundo entre cada movimiento
             # Publicar la ubicación en Kafka
-        nuetro_topic = 'movimientos'
+        nuestro_topic = 'movimientos'
         payload = {
             'ID': self.id,
             'POS': f"{x_actual},{y_actual}"
         }
-        producer.send(topic=nuetro_topic,value=payload)
+        producer.send(topic=nuestro_topic,value=payload)
         print(f"Dron {self.id} se mueve a {x_actual},{y_actual}")
                  
     
