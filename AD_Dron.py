@@ -12,7 +12,7 @@ file_Dron= 'Dron.json'
 
 
 config_destinos = {
-    'auto_offset_reset': 'earliest',
+    'auto_offset_reset': 'lastest',
     'enable_auto_commit': True,
     'value_deserializer': lambda m: json.loads(m.decode('utf-8'))
 }
@@ -121,10 +121,19 @@ class AD_Drone:
             if respuesta == "<ACK>":
                 print("autenticacion correcta")
                 consumer_destino =inicializar_consumidor('destinos',IP_Puerto_Broker,config_destinos)
-                for mensajes in consumer_destino:
-                    # Procesa el primer mensaje recibido y luego rompe el bucle
-                    destinos =  mensajes.value
-                    break
+                consumer_destino = consumer_destino.subscribe(['destinos'])
+                while True:
+                    try:
+                        for mensajes in consumer_destino:
+                            print("entra")
+                            # Procesa el primer mensaje recibido y luego rompe el bucle
+                            destinos =  mensajes.value
+                            break
+                        break
+                    except Exception as e:
+                        
+                        continue
+                    
                 for drones in destinos["Drones"]:
                     if drones["ID"]== self.id:
                         destino = tuple(map(int, drones["POS"].split(',')))
@@ -166,7 +175,7 @@ class AD_Drone:
    
     def mover_drone(self, destino):
         x_actual , y_actual = self.posicion
-        x_final, y_final = map(int, destino['POS'].split(','))
+        x_final, y_final =  destino['POS']
            
         if x_actual < x_final:
             x_actual += 1
