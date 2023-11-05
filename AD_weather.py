@@ -8,7 +8,7 @@ ruta = "bd_Clima.json"
 def ejecutar_servidor(puerto):
     
     servidor = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    servidor.bind(("localhost", int(puerto)))
+    servidor.bind(("0.0.0.0", int(puerto)))
     servidor.listen(1)
     print(f"Esperando conexión en el puerto {puerto}...")
 
