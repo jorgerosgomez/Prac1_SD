@@ -232,15 +232,15 @@ class Dron:
         self.identificador = identificador
         self.posicion = list(posicion)
         self.llego_a_destino = False
-        self.ultimo_movimiento = 0.0
+        self.ultimo_movimiento = None
     def llego_destino(self):
         self.llego_a_destino = True    
 
     def reset(self):
         self.llego_a_destino =False
-        self.posicion= [0,0]#posible fallo
+        self.posicion= (0,0)#posible fallo
     def actualizar_posicion(self, posicion):
-        self.posicion = list(map(int, posicion.split(',')))
+        self.posicion = posicion
         self.ultimo_movimiento = time.time()
     def tiempo_sin_movimiento(self):
         if self.ultimo_movimiento is None:
@@ -340,9 +340,10 @@ if __name__ == "__main__":
                 break 
                 
             for posicion_actualizada in consumer:
+                posicion_actualizada = posicion_actualizada.value
                 for drone in drones_autenticados:
                     if drone.identificador == posicion_actualizada["ID"] :
-                            drone.actualizar_posicion(posicion_actualizada['POS'])
+                            drone.actualizar_posicion(list(posicion_actualizada['POS']))
                             mapa = pintar_mapa(drones_autenticados)    
                             producer.send('mapa', value=mapa.encode('utf-8'))
                             break
@@ -355,9 +356,8 @@ if __name__ == "__main__":
         for dron in drones_autenticados:
             dron.reset()
     print("ha llegado el espectaculo al final")
-    topic_borrar = ["destinos", "movimientos","mapa"]
+
     try:
-        administrador.delete_topics(topic_borrar)
         producer.close()
         consumer.close()
         clima_socket.close()
