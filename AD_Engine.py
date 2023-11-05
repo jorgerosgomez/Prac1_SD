@@ -315,7 +315,7 @@ if __name__ == "__main__":
             print("Esperando la conexion de drones necesarios para iniciar el espectaculo....")
             condicion_drones.wait()
     input("Se han conectado los drones necesarios, pulse cualquier tecla para iniciar el espectaculo")
-    threading.Thread(target=verificar_drones_desconectados).start()
+    #threading.Thread(target=verificar_drones_desconectados).start()
     
     #conectarse al servidor de clima
     clima_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

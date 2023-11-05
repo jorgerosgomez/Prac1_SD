@@ -17,7 +17,6 @@ config_destinos = {
     'value_deserializer': lambda m: json.loads(m.decode('utf-8'))
 }
 config_mapa={
-    'auto_offset_reset': 'lastest',
     'enable_auto_commit': False,
     
 }
@@ -120,48 +119,36 @@ class AD_Drone:
             respuesta =  servidor.recv(1024).decode()
             if respuesta == "<ACK>":
                 print("autenticacion correcta")
-                consumer_destino =inicializar_consumidor('destinos',IP_Puerto_Broker,config_destinos)
-               
-                for mensajes in consumer_destino:
+                while True:    
+                    consumer_destino =inicializar_consumidor('destinos',IP_Puerto_Broker,config_destinos)
+                
+                    for mensajes in consumer_destino:
+                        
+                                # Procesa el primer mensaje recibido y luego rompe el bucle
+                        destinos =  mensajes.value
+                        break
+                        
+                        
+                    for drones in destinos["Drones"]:
+                        if drones["ID"]== self.id:
+                            destino = tuple(map(int, drones["POS"].split(',')))
                     
-                            # Procesa el primer mensaje recibido y luego rompe el bucle
-                    destinos =  mensajes.value
-                    break
-                       
-                    
-                for drones in destinos["Drones"]:
-                    if drones["ID"]== self.id:
-                        destino = tuple(map(int, drones["POS"].split(',')))
-                 
-                        print(f"El dron con ID {self.id} debe moverse a la posición {destino}")
-                        #logica para moverse 
-                        #self.posicion --> destino # cada vez que se mueva mandar un mensaje al topic movimiento
-    
-                        while self.posicion != destino:
-                            self.mover_drone(destino)
-                            #leer un topic de kafka que sea error
-                            consumer_error= inicializar_consumidor('error_topic', IP_Puerto_Broker)
-                            try:
-                                for mensajes in consumer_error:
-                                    mensaje_texto = mensajes.value.decode('utf-8')
-                                    print(f"Mensaje de error recibido: {mensaje_texto}")
-                                    destino= (1,1)
-                                    while self.posicion != destino:
-                                        self.mover_drone(destino)
-                                    print("Las condiciones son adversas volvemos a la base")
-                                    sys.exit(1)
-                            except Exception:
-                                
-                        #leer topic mapa y print 
+                            print(f"El dron con ID {self.id} debe moverse a la posición {destino}")
+                            #logica para moverse 
+                            #self.posicion --> destino # cada vez que se mueva mandar un mensaje al topic movimiento
+        
+                            while self.posicion != destino:
+                                sleep(2)
+                                self.mover_drone(destino)
                                 consumer_mapa = inicializar_consumidor('mapa', IP_Puerto_Broker,config_mapa)
                                 for mensajes in consumer_mapa:
                                     mapa = mensajes.value
                                     print(mapa)
-                                break
+                                    break
+                        
                     
-                    else:
-                        print(f"No se encontro destino para el dron con id:{self.id}")
-                
+                            
+                    
                         
                     
                 
@@ -193,7 +180,7 @@ class AD_Drone:
         nuestro_topic = 'movimientos'
         payload = {
             'ID': self.id,
-            'POS': f"{x_actual},{y_actual}"
+            'POS': (x_actual,y_actual)
         }
         producer.send(topic=nuestro_topic,value=payload)
         print(f"Dron {self.id} se mueve a {x_actual},{y_actual}")
