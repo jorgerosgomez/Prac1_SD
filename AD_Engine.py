@@ -33,7 +33,7 @@ def creacion_topics(administrador):
 
 def verificar_drones_desconectados():
     while True:
-        drones_a_eliminar = [drone for drone in drones_autenticados if drone.tiempo_sin_movimiento() > 5]
+        drones_a_eliminar = [drone for drone in drones_autenticados if drone.tiempo_sin_movimiento() > 15]
         for drone in drones_a_eliminar:
             print(f"El dron con id {drone.identificador} ha perdido la conexión y se ha eliminado")
             drones_autenticados.remove(drone)
@@ -172,7 +172,7 @@ def manejar_conexion(conexion,ad_engine):
             print( "Conexión exitosa")
             dron = Dron(identificador=int(id_dron),posicion=(0,0)) 
             with condicion_drones:
-                drones_autenticados.append(dron)
+                drones_autenticados.append(dron)             
                 condicion_drones.notify()
             conexion.send("<ACK>".encode())
         else:
@@ -342,6 +342,7 @@ if __name__ == "__main__":
             for posicion_actualizada in consumer:
                 posicion_actualizada = posicion_actualizada.value
                 for drone in drones_autenticados:
+                    print(type(posicion_actualizada['POS']))
                     if drone.identificador == posicion_actualizada["ID"] :
                             drone.actualizar_posicion(list(posicion_actualizada['POS']))
                             mapa = pintar_mapa(drones_autenticados)    

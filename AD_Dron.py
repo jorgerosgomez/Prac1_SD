@@ -13,12 +13,11 @@ file_Dron= 'Dron.json'
 
 
 config_destinos = {
-    'enable_auto_commit': True,
+
     'value_deserializer': lambda m: json.loads(m.decode('utf-8'))
 }
 config_mapa={
-    'enable_auto_commit': False,
-    
+    'value_deserializer' :  lambda m: m.decode('utf-8')
 }
 
 def inicializar_productor(broker_address):
@@ -142,8 +141,8 @@ class AD_Drone:
                                 self.mover_drone(destino)
                                 consumer_mapa = inicializar_consumidor('mapa', IP_Puerto_Broker,config_mapa)
                                 for mensajes in consumer_mapa:
-                                    mapa = mensajes.value
-                                    print(mapa)
+                                    
+                                    print(mensajes.value)
                                     break
                         
                     
