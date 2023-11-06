@@ -77,7 +77,9 @@ def inicializar_consumidor(topic, broker_address):
     consumer = KafkaConsumer(
         topic,
         bootstrap_servers=broker_address,
+        enable_auto_commit=True, 
         value_deserializer=lambda x: json.loads(x.decode('utf-8'))
+        
     )
     return consumer
 
@@ -238,7 +240,7 @@ class Dron:
 
     def reset(self):
         self.llego_a_destino =False
-        self.posicion= (0,0)#posible fallo
+        
     def actualizar_posicion(self, posicion):
         self.posicion = posicion
         self.ultimo_movimiento = time.time()
@@ -261,17 +263,14 @@ class AD_Engine:
         self.drones_conectados = 0
 
     def verificar(self,id,token):
-        print("entra verificar")
         with open(file_engine) as f:
             self.lista_de_objetos = json.load(f)['lista_de_objetos']
-        print(self.lista_de_objetos)
         for dron_info in self.lista_de_objetos:
             if str(id) in dron_info and dron_info[str(id)]['token'] == token:
                 
                 return True
         return False
     def conectar_dron(self, id, token):
-        print(self.drones_conectados)
         
         if self.drones_conectados < int(numero_drones) and self.verificar(id, token):
             self.drones_conectados += 1
@@ -327,6 +326,7 @@ if __name__ == "__main__":
         print(f"Comenzando a formar la figura: {figura['Nombre']}")
 
         # Manda la figura entera al broker destino
+        print(figura)
         producer.send('destinos', json.dumps(figura).encode('utf-8'))
 
         # hasta que todos los drones no llegen a su destino de figura ...
@@ -345,6 +345,10 @@ if __name__ == "__main__":
                     print(type(posicion_actualizada['POS']))
                     if drone.identificador == posicion_actualizada["ID"] :
                             drone.actualizar_posicion(list(posicion_actualizada['POS']))
+                            destino_drone = next((list(map(int, d['POS'].split(','))) for d in figura['Drones'] if d['ID'] == drone.identificador), None)
+                            if destino_drone and drone.posicion == destino_drone:
+                                drone.llego_a_destino = True
+
                             mapa = pintar_mapa(drones_autenticados)    
                             producer.send('mapa', value=mapa.encode('utf-8'))
                             break
@@ -354,6 +358,8 @@ if __name__ == "__main__":
         # final de fig
         print(f"Figura {figura['Nombre']} completada")
         #Estaran con llega_A_destino en true
+        pintar_mapa(drones_autenticados)
+        sleep(2)
         for dron in drones_autenticados:
             dron.reset()
     print("ha llegado el espectaculo al final")
