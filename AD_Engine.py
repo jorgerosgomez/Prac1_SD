@@ -33,7 +33,7 @@ def creacion_topics(administrador):
 
 def verificar_drones_desconectados():
     while True:
-        drones_a_eliminar = [drone for drone in drones_autenticados if drone.tiempo_sin_movimiento() > 5]
+        drones_a_eliminar = [drone for drone in drones_autenticados if drone.tiempo_sin_movimiento() > 15]
         for drone in drones_a_eliminar:
             print(f"El dron con id {drone.identificador} ha perdido la conexión y se ha eliminado")
             drones_autenticados.remove(drone)
@@ -77,7 +77,9 @@ def inicializar_consumidor(topic, broker_address):
     consumer = KafkaConsumer(
         topic,
         bootstrap_servers=broker_address,
+        enable_auto_commit=True, 
         value_deserializer=lambda x: json.loads(x.decode('utf-8'))
+        
     )
     return consumer
 
@@ -172,7 +174,7 @@ def manejar_conexion(conexion,ad_engine):
             print( "Conexión exitosa")
             dron = Dron(identificador=int(id_dron),posicion=(0,0)) 
             with condicion_drones:
-                drones_autenticados.append(dron)
+                drones_autenticados.append(dron)             
                 condicion_drones.notify()
             conexion.send("<ACK>".encode())
         else:
@@ -232,15 +234,15 @@ class Dron:
         self.identificador = identificador
         self.posicion = list(posicion)
         self.llego_a_destino = False
-        self.ultimo_movimiento = 0.0
+        self.ultimo_movimiento = None
     def llego_destino(self):
         self.llego_a_destino = True    
 
     def reset(self):
         self.llego_a_destino =False
-        self.posicion= [0,0]#posible fallo
+        
     def actualizar_posicion(self, posicion):
-        self.posicion = list(map(int, posicion.split(',')))
+        self.posicion = posicion
         self.ultimo_movimiento = time.time()
     def tiempo_sin_movimiento(self):
         if self.ultimo_movimiento is None:
@@ -261,17 +263,14 @@ class AD_Engine:
         self.drones_conectados = 0
 
     def verificar(self,id,token):
-        print("entra verificar")
         with open(file_engine) as f:
             self.lista_de_objetos = json.load(f)['lista_de_objetos']
-        print(self.lista_de_objetos)
         for dron_info in self.lista_de_objetos:
             if str(id) in dron_info and dron_info[str(id)]['token'] == token:
                 
                 return True
         return False
     def conectar_dron(self, id, token):
-        print(self.drones_conectados)
         
         if self.drones_conectados < int(numero_drones) and self.verificar(id, token):
             self.drones_conectados += 1
@@ -306,7 +305,7 @@ if __name__ == "__main__":
         
     destinos = leer_destinos(file_destinos)
     producer = inicializar_productor(ip_puerto_broker)
-    consumer = inicializar_consumidor('movimiento', ip_puerto_broker)
+    consumer = inicializar_consumidor('movimientos', ip_puerto_broker)
     iniciar_servidor(puerto_escucha, motor) 
     numero_drones_figura = len(destinos["figuras"][0]["Drones"])
     #esperamos que los drones necesarios se conecten desde el hilo 
@@ -327,6 +326,7 @@ if __name__ == "__main__":
         print(f"Comenzando a formar la figura: {figura['Nombre']}")
 
         # Manda la figura entera al broker destino
+        print(figura)
         producer.send('destinos', json.dumps(figura).encode('utf-8'))
 
         # hasta que todos los drones no llegen a su destino de figura ...
@@ -340,9 +340,15 @@ if __name__ == "__main__":
                 break 
                 
             for posicion_actualizada in consumer:
+                posicion_actualizada = posicion_actualizada.value
                 for drone in drones_autenticados:
+                    print(type(posicion_actualizada['POS']))
                     if drone.identificador == posicion_actualizada["ID"] :
-                            drone.actualizar_posicion(posicion_actualizada['POS'])
+                            drone.actualizar_posicion(list(posicion_actualizada['POS']))
+                            destino_drone = next((list(map(int, d['POS'].split(','))) for d in figura['Drones'] if d['ID'] == drone.identificador), None)
+                            if destino_drone and drone.posicion == destino_drone:
+                                drone.llego_a_destino = True
+
                             mapa = pintar_mapa(drones_autenticados)    
                             producer.send('mapa', value=mapa.encode('utf-8'))
                             break
@@ -352,12 +358,13 @@ if __name__ == "__main__":
         # final de fig
         print(f"Figura {figura['Nombre']} completada")
         #Estaran con llega_A_destino en true
+        pintar_mapa(drones_autenticados)
+        sleep(2)
         for dron in drones_autenticados:
             dron.reset()
     print("ha llegado el espectaculo al final")
-    topic_borrar = ["destinos", "movimientos","mapa"]
+
     try:
-        administrador.delete_topics(topic_borrar)
         producer.close()
         consumer.close()
         clima_socket.close()
