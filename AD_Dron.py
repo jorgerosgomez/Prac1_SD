@@ -4,6 +4,7 @@ import json
 import time
 from time import sleep
 from kafka import KafkaConsumer,KafkaProducer
+import threading
 
 
 
@@ -14,10 +15,12 @@ file_Dron= 'Dron.json'
 def registrar_archivo():
     with open('dron.json', 'r') as file:
         return json.load(file)
-    
+
 
 config_destinos = {
 
+    'auto_offset_reset' : 'latest', 
+    'enable_auto_commit': False,
     'value_deserializer': lambda m: json.loads(m.decode('utf-8'))
 }
 config_mapa={
@@ -72,10 +75,41 @@ def incluir_json(file_Dron, dato):
 
     except Exception as e:
         print(f'Ocurrió un error: {e}')
+def consultar_mapa():
+    global cerrar_hilos,perdida_conexion
+     
+    consultar_mapa =inicializar_consumidor('mapa',IP_Puerto_Broker)
+    
+    while cerrar_hilos:
+          
+        messages = consultar_mapa.poll(timeout_ms=15000)  # Obtiene los mensajes disponibles
+
+        last_message = None
+        for tp, msgs in messages.items():
+            if msgs:
+                last_message = msgs[-1]  # Tomar el último mensaje de la lista
+               
+
+        if not messages:
+            perdida_conexion =True
+            sys.exit()
+        if last_message:
+            mensaje_decodificado = last_message.value.decode('utf-8')
+            mapa = mensaje_decodificado
+            print(mapa)
+               
+def contador_expiracion():
+    sleep(20)
+    global ack_autenticado
+    if ack_autenticado == False:
+        print(" \n Su autenticación expiró solicite un nuevo token si quiere autenticarse en el especataculo \n -->", end="")
+        
+    
+
+        
 
 
-
-
+    
 class AD_Drone:
     #CREAMOS LA CLASE DRON
     def __init__(self,id,Alias, IP_Engine, Puerto_Engine, Ip_Puerto_Broker,IP_Registry , Puerto_Registry,token =None):
@@ -113,48 +147,65 @@ class AD_Drone:
             print(f"ERROR:  {e}")
     
     def unirse_espectaculo(self):
-        
+        global ack_autenticado
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as servidor:
             servidor.connect((self.IP_Engine, self.Puerto_Engine))
-            
             data_token = f"<STX>{self.id},{self.token}<ETX>"
             data_token = data_token + calcular_lrc(data_token)
             servidor.send(data_token.encode())          
             respuesta =  servidor.recv(1024).decode()
+            consumer_destino =inicializar_consumidor('destinos',IP_Puerto_Broker,config_destinos)
             if respuesta == "<ACK>":
+                ack_autenticado = True
+                hilo_mapa=threading.Thread(target=consultar_mapa)
                 print("autenticacion correcta")
-                while True:    
-                    consumer_destino =inicializar_consumidor('destinos',IP_Puerto_Broker,config_destinos)
+                x_actual , y_actual = self.posicion
+                payload = {
+                    'ID': self.id,
+                    'POS': (x_actual,y_actual)
+                }
                 
-                    for mensajes in consumer_destino:
+                for mensajes in consumer_destino:
                         
-                                # Procesa el primer mensaje recibido y luego rompe el bucle
+                                
                         destinos =  mensajes.value
                         break
-                    print(destinos)    
-                        
+                producer.send(topic='movimientos',value=payload)
+                hilo_mapa.start()
+                while True:    
+                    
+                    messages = consumer_destino.poll(timeout_ms=1000)  # Obtiene los mensajes disponibles
+
+                    last_message = None
+                    for tp, msgs in messages.items():
+                        if msgs:
+                            last_message = msgs[-1]  # Tomar el último mensaje de la lista
+
+                    if last_message:
+                        destinos = last_message.value
+
+                    nombre_forma = destinos["Nombre"] 
                     for drones in destinos["Drones"]:
                         if drones["ID"]== self.id:
                             destino = tuple(map(int, drones["POS"].split(',')))
                     
-                            print(f"El dron con ID {self.id} debe moverse a la posición {destino}")
-                            x_actual , y_actual = self.posicion
-                            payload = {
-                                'ID': self.id,
-                                'POS': (x_actual,y_actual)
-                            }
-                            producer.send(topic='movimientos',value=payload)
-                            
-                            #logica para moverse 
-                            #self.posicion --> destino # cada vez que se mueva mandar un mensaje al topic movimiento
-        
-                            while self.posicion != destino:
-                               
-                                
+                            print(f"El dron con ID {self.id} debe de {self.posicion} moverse a la posición {destino}")
+                           
+                            sleep(1.5)
+                            self.mover_drone(destino)
+                            if perdida_conexion == True:
+                                print("PERDIDA DE CONEXION ABAJO")
+                                print("Perdida de conexion con el servidor,Vuelvo a la base y me desconecto...")
+                                sys.exit()
+                                    
+                            if nombre_forma == "Base" and self.posicion == (0,0):
                                 sleep(2)
-                                self.mover_drone(destino)
-                               
-                        
+                                cerrar_hilos = False
+                                print("El espectaculo ha terminado, Me desconecto...")
+                                sys.exit()
+                       
+                                                        
+                                            
                     
                             
                     
@@ -192,7 +243,6 @@ class AD_Drone:
             'POS': (x_actual,y_actual)
         }
         producer.send(topic=nuestro_topic,value=payload)
-        print(f"Dron {self.id} se mueve a {x_actual},{y_actual}")
         sleep(1.5)
                  
     
@@ -243,10 +293,12 @@ class AD_Drone:
             ack = cliente_conexion.recv(1024).decode()
             if ack == "<ACK>":
                 print("Mensaje enviado correctamente")
+                print("tiene 20 segundos para conectarse")
+                threading.Thread(target=contador_expiracion).start()
                 token = cliente_conexion.recv(1024).decode()
-                dato[f"{id}"]['token'] =  token
-                self.token = token
-                incluir_json(file_Dron,dato) 
+                
+                self.token, self.Expiracion = token.split("/")
+                
                 cliente_conexion.close()
        
     def Dar_baja(self):
@@ -262,45 +314,46 @@ def separar_arg(arg):
     return parte[0] , int(parte[1])    
 
 if __name__ == "__main__":
-   
-    if len(sys.argv) !=  4:
-        print("Error de argumentos")
-        sys.exit(1)
-    else:
-        #registramos todos los puertos e ips introducidos por paramentros
-        IP_Engine , Puerto_Engine =  separar_arg(sys.argv[1])
-        IP_Puerto_Broker =  sys.argv[2]
-        IP_Registry , Puerto_Registry =  separar_arg(sys.argv[3])
-        producer =inicializar_productor(IP_Puerto_Broker)
-        print("Puertos registrados...")
-        drone_encontrado =False
-        bd_json =registrar_archivo()
-        id= int(input("Por favor, establece la ID del dispositivo\n-->"))
-        for date in bd_json["lista_de_objetos"]:
-            if str(id) in date:
-                    drone_data = date[str(id)]
-                    alias = drone_data["alias"]
-                    token = drone_data["token"]
+    try:
+        if len(sys.argv) == 5:
+            print("Error de argumentos")
+            sys.exit(1)
+        else:
+            ack_autenticado = False 
+            perdida_conexion =False
+            #registramos todos los puertos e ips introducidos por paramentros
+            IP_Engine , Puerto_Engine =  separar_arg(sys.argv[1])
+            IP_Puerto_Broker =  sys.argv[2]
+            IP_Registry , Puerto_Registry =  separar_arg(sys.argv[3])
+            producer =inicializar_productor(IP_Puerto_Broker)
+            print("Puertos registrados...")
+            drone_encontrado =False
+            cerrar_hilos =True
+            mapa = ""
+            
+            bd_json =registrar_archivo()
+        
+            id= int(input("Por favor, establece la ID del dispositivo\n-->"))
 
-                    drone = AD_Drone(id, alias,IP_Engine, Puerto_Engine, IP_Puerto_Broker, IP_Registry, Puerto_Registry, token)
-                    drone_encontrado = True
-                    break
-                
-        if not drone_encontrado:        
-            Alias =  input("Por favor, establece el alias del dispositivo\n-->")
-            # Crear una instancia de AD_Drone
+        
+            Alias =  f"Dron {id}"
+                # Crear una instancia de AD_Drone
             drone = AD_Drone(id,Alias, IP_Engine, Puerto_Engine, IP_Puerto_Broker, IP_Registry, Puerto_Registry)
-        while True:
-            menu = input("Elige una de las opciones:\n" +
-                        "1-Registrar\n" +
-                        "2-Unirse al espectaculo\n" +
-                        "3-Salir\n-->")
-            if menu == '1':
-                drone.registrar()
-            elif menu == '2':
-                drone.unirse_espectaculo()
-            elif menu == '3':
-                print("Saliendo...")
-                break
-            else:
-                print("Error de menú")
+     
+                
+            while True:
+                menu = input("Elige una de las opciones:\n" +
+                            "1-Registrar\n" +
+                            "2-Unirse al espectaculo\n" +
+                            "3-Salir\n-->")
+                if menu == '1':
+                    drone.registrar()
+                elif menu == '2':
+                    drone.unirse_espectaculo()
+                elif menu == '3':
+                    print("Saliendo...")
+                    break
+                else:
+                    print("Error de menú")
+    except KeyboardInterrupt:
+        print("DRON CERRADO MANUALMENTE...")

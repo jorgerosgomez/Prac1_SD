@@ -24,9 +24,9 @@ def ejecutar_servidor(puerto):
 
             ciudad = json.loads(data)["ciudad"]
             datos = cargar_datos_clima()
-
-            temperatura = datos.get(ciudad, {"temperatura": 15})["temperatura"]
+            temperatura = datos.get(ciudad, 15)
             respuesta = {"ciudad": ciudad, "temperatura": temperatura}
+ 
             
             conn.send(json.dumps(respuesta).encode())
 
@@ -42,10 +42,11 @@ def cargar_datos_clima():
     with open(ruta, "r") as file:
         try:
             datos = json.load(file)
+            clima_ciudades = {item["ciudad"]: item["temperatura"] for item in datos["lista ciudades"]}
         except json.JSONDecodeError:
             datos = {}
             print("Error: El archivo JSON está vacío o tiene un formato incorrecto.")
-    return datos
+    return clima_ciudades
 
 
 

@@ -1,0 +1,136 @@
+
+body{
+    background-color: grey;
+    margin: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    
+
+}
+
+.navbar {
+    background-color: black; /* Color de fondo */
+    overflow: hidden; /* Asegúrate de que todo se mantenga en una sola línea */
+    display: flex;
+    flex-direction: row;
+    justify-content: space-around;
+    align-items: center;
+    border: none;
+    outline: none;
+
+    
+    height: 90px;
+    
+}
+.navbar button{
+
+
+  background-color: #fff;
+  border: 0 solid #e2e8f0;
+  border-radius: 1.5rem;
+  box-sizing: border-box;
+  color: #0d172a;
+  cursor: pointer;
+  display: inline-block;
+  font-family: "Basier circle",-apple-system,system-ui,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";
+  font-size: 1.1rem;
+  font-weight: 600;
+  line-height: 1;
+  padding: 1rem 1.6rem;
+  text-align: center;
+  text-decoration: none #0d172a solid;
+  text-decoration-thickness: auto;
+  transition: all .1s cubic-bezier(.4, 0, .2, 1);
+  box-shadow: 0px 1px 2px rgba(166, 175, 195, 0.25);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+.navbar button:hover {
+  background-color: #1e293b;
+  color: #fff;
+}
+
+@media (min-width: 768px) {
+  .navbar button {
+    font-size: 1.125rem;
+    padding: 1rem 2rem;
+  }
+}
+
+.clima{
+    display: flex;
+    
+    justify-content: center;
+    align-items: center;
+    height: 50px; /* Ajusta esto según lo que necesites */
+    margin: 20px auto; /* Margen superior e inferior y auto a los lados para centrar */
+    padding: 10px; /* Espaciado interno */
+    background-color: #ffffff; /* Fondo blanco o cualquier otro color */
+    border: 1px solid #dddddd; /* Borde sutil, ajusta a tus preferencias */
+    border-radius: 5px; /* Bordes redondeados */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Sombra para darle un efecto elevado */
+    width: 80%; /* O el ancho que prefieras */
+    font-size: 30px;
+    font: bold;
+    visibility: visible;
+    box-sizing: border-box; /* Para incluir el padding y border en el width total */
+
+}
+.mapa-avisos-container {
+    position: relative; /* Establece una referencia para la posición absoluta de los hijos */
+    max-width: calc(20 * 25px); /* El mismo ancho que el del mapa */
+    margin: 20px auto; /* Centra el contenedor en la página */
+}
+
+
+.Mapa-drones {
+    display: grid;
+    grid-template-columns: repeat(20, 1fr); /* 20 columnas que llenan el espacio disponible */
+    grid-gap: 0; /* No hay espacio entre las celdas de la grilla */
+    justify-content: center; /* Centra la grilla horizontalmente si hay espacio adicional */
+    align-content: center; /* Centra la grilla verticalmente si hay espacio adicional */
+    max-width: calc(20 * 25px); /* Asumiendo que quieres que cada celda tenga 25px de ancho */
+    margin: auto; /* Centra el contenedor de la grilla en la página */
+}
+
+.drone-map-cell {
+    width: 25px; /* Ancho de la celda, ajusta según tus necesidades */
+    height: 25px; /* Altura de la celda para hacerla cuadrada */
+    background-color: #ddd; /* Color de fondo para cada celda */
+    border: 1px solid black; /* Borde para cada celda */
+}
+
+
+.drone-present {
+    background-color: #444; /* Color de fondo cuando hay un dron en la celda */
+    color: #fff; /* Color del texto para el ID del dron */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.Avisos {
+    position: absolute;
+    bottom: -70px; /* Ajusta según la altura de .Avisos */
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: white;
+    border-radius: 30px;
+    text-align: center;
+    height: 40px;
+    padding: 10px; /* Asegúrate de que el padding no sea demasiado grande */
+    
+    font-size: 20px; /* Tamaño de la fuente */
+    font-weight: bold; /* Texto en negrita */
+    line-height: 40px; /* Alinea el texto verticalmente */
+    color: #000; /* Color del texto */
+    white-space: nowrap; /* Evita que el texto pase a la siguiente línea */
+    
+    box-sizing: border-box; /* Incluye el padding en el cálculo del ancho y alto */
+    display: flex; /* Usa flexbox */
+    justify-content: center; /* Centra horizontalmente */
+    align-items: center; /* Centra verticalmente */
+    width: auto; /* Ajusta el ancho automáticamente al contenido */
+    max-width: 80%; /* Evita que el contenedor sea más ancho que el 80% de su contenedor padre */
+}

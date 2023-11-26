@@ -44,7 +44,8 @@ def genera_token():
  
     caracteres = string.ascii_letters + string.digits
     token = ''.join(secrets.choice(caracteres) for _ in range(7))
-    return token
+    caducidad  = int(time.time()) + 20
+    return f"{token}/{caducidad}"
 def desencriptar_paquete(paquete):
    #COMPRUEBA QUE EXISTA EL STX
     inicio = paquete.find("<STX>")
@@ -105,7 +106,7 @@ def procesar_cliente(cliente_conexion):
                    
                     primera_clave = next(iter(mensaje))
                  # Cambiar el atributo "token" para la primera clave
-                    mensaje[primera_clave]["token"] = token
+                    mensaje[primera_clave]["token"] ,mensaje[primera_clave]["Expiracion"]  = token.split("/")
                 except StopIteration:
                     print("El objeto JSON está vacío")
                 except Exception as e:
@@ -163,7 +164,7 @@ if __name__ == "__main__":
             sys.exit(1)
     
     puerto = sys.argv[1]
-    if puerto.isnumeric():  # Corregir aquí
+    if puerto.isnumeric():  
         registro(int(puerto))
     else:
         print("Error de puerto")
