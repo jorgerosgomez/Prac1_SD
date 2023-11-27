@@ -7,7 +7,7 @@ var DroneMapApp = (function() {
     
 
     function fetchDronePositions() {
-        fetch('http://127.0.0.1:5000/drones')
+        fetch('http://192.168.1.17:5000/drones')
             .then(response => {
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);

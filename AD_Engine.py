@@ -53,7 +53,7 @@ Api_Key = "b0aa597e242f93ff1ec1681b38eea56b"
 
 
 def iniciar_flask():
-    app.run(debug=True, use_reloader=False, port=5000)  # Asegúrate de elegir un puerto adecuado
+    app.run(host="0.0.0.0", debug=True, use_reloader=False, port=5000)  # Asegúrate de elegir un puerto adecuado
 
 def pintando_mapas(drones_autenticados):
     global debe_continuar
