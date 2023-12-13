@@ -5,10 +5,196 @@ import time
 from time import sleep
 from kafka import KafkaConsumer,KafkaProducer
 import threading
+from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.asymmetric import padding
+import os
+from cryptography.hazmat.backends import default_backend
+import requests
+from termcolor import colored
+import ctypes
+import os
+import platform
+
 
 
 
 file_Dron= 'Dron.json'
+
+
+
+def color_windows():
+    
+    version = platform.version().split('.')
+    if os.name == 'nt' and platform.release() == '10' and (int(version[0]), int(version[1]), int(version[2])) >= (10, 0, 14393):
+        kernel32 = ctypes.windll.kernel32
+        kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
+
+def registrar_mediante_api(self):
+    
+    url = f"https://{self.IP_Registry}:5001/registro"
+    print(url)
+    data = {
+        "id": self.id,
+        "alias": self.Alias
+    }
+    headers = {'Content-Type': 'application/json'}
+
+    response = requests.post(url, json=data, headers=headers, verify=False)
+    if response.status_code == 200:
+        print("Registro exitoso.")
+        self.token = response.json()[str(self.id)]['token']  # Almacenar el token
+        threading.Thread(target=contador_expiracion).start()
+        
+    else:
+        print("Error en el registro:", response.status_code)
+
+def cargar_clave_publica():
+    directorio = "claves_pub_engine_drones"
+    nombre_archivo = "publica_engine_drones.pem"
+    ruta_archivo = os.path.join(directorio, nombre_archivo)
+
+    if not os.path.exists(ruta_archivo):
+        print("Archivo de clave pública no encontrado.")
+        return None
+
+    with open(ruta_archivo, 'rb') as archivo_clave:
+        clave_publica_bytes = archivo_clave.read()
+
+    clave_publica = serialization.load_pem_public_key(
+        clave_publica_bytes,
+        backend=default_backend()
+    )
+    return clave_publica
+
+
+def cifrar_con_clave_publica(mensaje, clave_publica):
+    
+    
+    try:
+        if isinstance(mensaje, str):
+            mensaje_bytes = mensaje.encode('utf-8')
+        else:
+            mensaje_bytes = mensaje
+    
+        print(mensaje_bytes)
+        mensaje_cifrado = clave_publica.encrypt(
+            mensaje_bytes,
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
+        )
+    except Exception as e:
+       print(f"es aqui : {e}")
+    return mensaje_cifrado
+
+
+def guardar_clave_publica(clave_publica_bytes):
+    directorio = "claves_pub_engine_drones"
+    nombre_archivo = "publica_engine_drones.pem"
+
+    
+    if not os.path.exists(directorio):
+        os.makedirs(directorio)
+
+    ruta_archivo = os.path.join(directorio, nombre_archivo)
+
+   
+    with open(ruta_archivo, 'wb') as archivo_clave:
+        archivo_clave.write(clave_publica_bytes)
+
+
+def eliminar_archivo(nombre_archivo, directorio):
+  
+   
+    ruta_archivo = os.path.join(directorio, nombre_archivo)
+
+    # Comprobar si el archivo existe
+    if os.path.exists(ruta_archivo):
+       
+        os.remove(ruta_archivo)
+        print(f"El archivo {ruta_archivo} ha sido eliminado.")
+    else:
+        print(f"El archivo {ruta_archivo} no existe.")
+
+def desencriptar_con_clave_privada(clave_privada, mensaje_cifrado):
+    try:
+        mensaje_descifrado = clave_privada.decrypt(
+            mensaje_cifrado,
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
+        )
+        return mensaje_descifrado
+    except Exception as e:
+        print(f"Error al desencriptar: {e}")
+        return None
+
+def cargar_clave_privada(id_dron):
+    directorio = "claves_pri_dron"
+    nombre_archivo = f"{id_dron}.pem"
+    ruta_archivo = os.path.join(directorio, nombre_archivo)
+
+    # Verificar si el archivo existe
+    if not os.path.exists(ruta_archivo):
+        print(f"No se encontró la clave para el dron con ID {id_dron}")
+        return None
+
+    # Leer la clave privada del archivo
+    with open(ruta_archivo, 'rb') as archivo_clave:
+        clave_privada_bytes = archivo_clave.read()
+    
+    # Deserializar la clave privada
+    try:
+        clave_privada = serialization.load_pem_private_key(
+            clave_privada_bytes,
+            password=None,
+            backend=default_backend()
+        )
+        return clave_privada
+    except Exception as e:
+        print(f"Error al cargar la clave privada: {e}")
+        return None
+
+
+def guardar_clave_privada(id_dron, clave_privada_bytes):
+    directorio = "claves_pri_dron"
+    nombre_archivo = f"{id_dron}.pem"
+
+    # Crear directorio si no existe
+    if not os.path.exists(directorio):
+        os.makedirs(directorio)
+
+    ruta_archivo = os.path.join(directorio, nombre_archivo)
+
+    # Guardar la clave privada en formato bytes
+    with open(ruta_archivo, 'wb') as archivo_clave:
+        archivo_clave.write(clave_privada_bytes)
+
+def genera_claves():
+   
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+    )
+    public_key = private_key.public_key()
+    
+    private_key_serializada = private_key.private_bytes(
+        encoding= serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption()
+        
+    )
+    public_key_serializada = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+    return private_key_serializada, public_key_serializada
+    
 
 
 
@@ -28,18 +214,33 @@ config_mapa={
 }
 
 def inicializar_productor(broker_address):
-    return KafkaProducer(bootstrap_servers=broker_address, value_serializer=lambda v: json.dumps(v).encode('utf-8'))
+    return KafkaProducer(bootstrap_servers=broker_address,
+            security_protocol="SSL",
+            ssl_check_hostname=False,  # AL SER AUTOFIRMADO DEBERIAMOS HABER ESPECIFICADO LA IP CON LA QUE IBAMOS A TRABJAR PERO ES MEJOR NO HACER EL CHECK
+            ssl_cafile="claves\mycert.crt",  
+            ssl_certfile="claves\mycert.crt",  
+            ssl_keyfile="claves/mykey.key",   
+            value_serializer=lambda v: json.dumps(v).encode('utf-8'))
 
 def inicializar_consumidor(topic_name, broker_address, consumer_config=None):
     if consumer_config is None:
         consumer_config = {}
 
+    #ssl por defecto
+    ssl_config = {
+        'security_protocol': 'SSL',
+        'ssl_check_hostname': False, 
+        'ssl_cafile': 'claves/mycert.crt', 
+        'ssl_certfile': 'claves/mycert.crt',  
+        'ssl_keyfile': 'claves/mykey.key',  
+    }
     # Configuracion
     default_config = {
         'bootstrap_servers': broker_address
     }
 
-    final_config = {**default_config, **consumer_config}
+    final_config = {**default_config, **consumer_config, **ssl_config}
+
 
     # Inicializar el consumidor con la configuración final
     consumer = KafkaConsumer(topic_name, **final_config)
@@ -101,7 +302,8 @@ def consultar_mapa():
 def contador_expiracion():
     sleep(20)
     global ack_autenticado
-    if ack_autenticado == False:
+    global final
+    if ack_autenticado == False and final == False:
         print(" \n Su autenticación expiró solicite un nuevo token si quiere autenticarse en el especataculo \n -->", end="")
         
     
@@ -134,7 +336,11 @@ class AD_Drone:
                 #Esperamos el ACK del servidor
                 ack = cliente_conexion.recv(1024).decode()
                 if ack == "<ACK>":
+                    clave_privada, clave_publica = genera_claves()
+                    guardar_clave_privada(self.id, clave_privada)
+                    cliente_conexion.send(clave_publica)
                     print("Conexión exitosa.")
+                    
                     opcion = input("option:\n1-Dar de alta\n2-Editar\n3-Dar de baja\n-->")
                     self.ejecutar_menu_registrar(opcion,cliente_conexion)
                 else:
@@ -143,6 +349,7 @@ class AD_Drone:
 
         except socket.error as err:
             print(f"Error de socket: {err}")
+            
         except Exception as e:
             print(f"ERROR:  {e}")
     
@@ -152,7 +359,16 @@ class AD_Drone:
             servidor.connect((self.IP_Engine, self.Puerto_Engine))
             data_token = f"<STX>{self.id},{self.token}<ETX>"
             data_token = data_token + calcular_lrc(data_token)
-            servidor.send(data_token.encode())          
+         
+            cp_engine = servidor.recv(2048)
+            guardar_clave_publica(cp_engine)
+            cp_engine= None
+      
+
+            data_cifrado = cifrar_con_clave_publica(data_token,cargar_clave_publica())
+            print(data_cifrado)
+            
+            servidor.send(data_cifrado)          
             respuesta =  servidor.recv(1024).decode()
             consumer_destino =inicializar_consumidor('destinos',IP_Puerto_Broker,config_destinos)
             if respuesta == "<ACK>":
@@ -249,16 +465,22 @@ class AD_Drone:
     
     def registrar(self):
         #logica del registrar en AD_Registry
-        
+            
+  
+        eleccion=input("Registrar mediante socket ---> 1\nRegistras mediante API--->2\n")
+        if(eleccion == "1"):
             try:
-               self.conectar_al_servidor()
+                self.conectar_al_servidor()
             except ConnectionRefusedError as e:
-                print(f"Error de tipo: {e}")
+                    print(f"Error de tipo: {e}")
             except (socket.error, OSError) as e:
-                print(f"Error de socket: {e}")
+                    print(f"Error de socket: {e}")
             except Exception as e:
-                print(f"Error: {e}")
-
+                    print(f"Error: {e}")
+        elif(eleccion == "2"):
+            registrar_mediante_api(self,)
+        else:
+            print("error al seleccionar una opcion")
     
     def ejecutar_menu_registrar(self, opcion, cliente_conexion):
         try:
@@ -295,8 +517,12 @@ class AD_Drone:
                 print("Mensaje enviado correctamente")
                 print("tiene 20 segundos para conectarse")
                 threading.Thread(target=contador_expiracion).start()
-                token = cliente_conexion.recv(1024).decode()
+                token = cliente_conexion.recv(1024)
+                c_pri= cargar_clave_privada(self.id)
                 
+                token = desencriptar_con_clave_privada(c_pri,token)
+                token = token.decode('utf-8')
+
                 self.token, self.Expiracion = token.split("/")
                 
                 cliente_conexion.close()
@@ -319,8 +545,10 @@ if __name__ == "__main__":
             print("Error de argumentos")
             sys.exit(1)
         else:
+            color_windows()
             ack_autenticado = False 
             perdida_conexion =False
+            final = False
             #registramos todos los puertos e ips introducidos por paramentros
             IP_Engine , Puerto_Engine =  separar_arg(sys.argv[1])
             IP_Puerto_Broker =  sys.argv[2]
@@ -352,8 +580,11 @@ if __name__ == "__main__":
                     drone.unirse_espectaculo()
                 elif menu == '3':
                     print("Saliendo...")
+                    eliminar_archivo(f"{drone.id}.pem","claves_pri_dron")
+                    final =True
                     break
                 else:
                     print("Error de menú")
     except KeyboardInterrupt:
         print("DRON CERRADO MANUALMENTE...")
+        

@@ -4,6 +4,66 @@ var DroneMapApp = (function() {
     var Mapa = document.querySelector('.Mapa-drones');
     var botonocultar = document.getElementById('ocultarMapa');
     var mapSize = 20; // Tamaño del mapa
+    var botoniniciar = document.getElementById('iniciarEspectaculo')
+    var refresh = document.getElementById('refrescar')
+    var botonmandarbase = document.getElementById('base')
+    var dronePositions = {};
+
+
+    function refrescar(){ 
+        location.reload();
+    }
+    setInterval(refrescar,5000)
+
+    function mandarbase() {
+        // Cambia la URL a la que necesitas enviar la solicitud POST
+        fetch('http://192.168.1.17:5000/base', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log(data); 
+        })
+        .catch(error => {
+            console.error('There was an error starting the show:', error);
+        });
+    }
+    function iniciarEspectaculo() {
+        // Cambia la URL a la que necesitas enviar la solicitud POST
+        fetch('http://192.168.1.17:5000/iniciarEspectaculo', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+               
+            },
+           
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log(data); // Aquí manejas la respuesta
+        })
+        .catch(error => {
+            console.error('There was an error starting the show:', error);
+        });
+    }
+
+
+
+
     
 
     function fetchDronePositions() {
@@ -25,15 +85,20 @@ var DroneMapApp = (function() {
                 });
             })
             .catch(error => {
-                console.error('There was an error fetching the drone positions:', error);
+                console.error('no hy drones', error);
             });
     }
-    function clearDronePositions() {
-        const allCells = document.querySelectorAll('.drone-map-cell');
-        allCells.forEach(cell => {
-            cell.textContent = ''; // Eliminar el identificador del dron
-            cell.classList.remove('drone-present'); // Eliminar la clase que indica la presencia de un dron
-        });
+    function clearDronePositions(droneId) {
+        // Si el dron ya está en el mapa, limpia su posición actual
+        if (dronePositions[droneId]) {
+            const { x, y } = dronePositions[droneId];
+            const cellSelector = `.drone-map-cell[data-row="${y}"][data-col="${x}"]`;
+            const cell = document.querySelector(cellSelector);
+            if (cell) {
+                cell.textContent = '';
+                cell.classList.remove('drone-present');
+            }
+        }
     }
 
     // Función para crear el mapa de drones
@@ -58,20 +123,20 @@ var DroneMapApp = (function() {
 
     // Función para actualizar la posición de un dron en el mapa
     function updateDronePosition(droneId, x, y) {
-        // Primero, elimina la clase 'drone-present' de todas las celdas para limpiar estados anteriores
-        document.querySelectorAll('.drone-map-cell.drone-present').forEach(cell => {
-            cell.classList.remove('drone-present');
-        });
+        // Limpia la posición anterior del dron
+        clearDronePositions(droneId);
     
-        // Encuentra la celda correspondiente a las coordenadas (x, y)
+        // Encuentra la celda correspondiente a las nuevas coordenadas (x, y)
         const cellSelector = `.drone-map-cell[data-row="${y}"][data-col="${x}"]`;
         const cell = document.querySelector(cellSelector);
-        
+    
         // Asegúrate de que la celda existe para evitar errores
-        if(cell) {
+        if (cell) {
             // Actualiza el contenido de la celda con el ID del dron y cambia el color de fondo a verde
             cell.textContent = droneId;
             cell.classList.add('drone-present');
+            // Actualiza el registro de la posición del dron
+            dronePositions[droneId] = { x, y };
         }
     }
 
@@ -81,6 +146,9 @@ var DroneMapApp = (function() {
         Mapa.style.display = 'grid';
         // Añadir el evento de clic al botón
         botonocultar.addEventListener('click', MapaEsVisible);
+        botoniniciar.addEventListener('click', iniciarEspectaculo);
+        botonmandarbase.addEventListener("click",mandarbase)
+        refresh.addEventListener("click", refrescar)
         // Crear el mapa de drones
         CrearMapa();
         setInterval(fetchDronePositions,1000);

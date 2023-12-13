@@ -11,7 +11,20 @@ import time
 import requests
 import os 
 from flask import Flask, jsonify, request
-
+import logging
+from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.asymmetric import padding
+from termcolor import colored
+import ctypes
+import os
+import platform
+from cryptography.hazmat.backends import default_backend
+"""
+#quitar avisos de conexion
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
+"""
 app = Flask(__name__)
 
 @app.route('/drones', methods=['GET'])
@@ -20,14 +33,25 @@ def get_drones():
     drones_dict = [dron.to_dict() for dron in drones_autenticados]
     return jsonify(drones_dict)
 
-@app.route('/')
-def init():
-    return "hello word"
+
+
+@app.route("/iniciarEspectaculo", methods= ["POST"])
+def iniciarEspectaculo():
+    global debe_iniciar_espectaculo
+    
+    debe_iniciar_espectaculo.set()
+    return jsonify({"status": "Espectaculo iniciado"}),200
+@app.route("/base", methods= ["POST"])
+def base():
+    global clima_adverso
+    
+    clima_adverso= True
+    return jsonify({"status": "vuelven a la base"}),200
 
 
 @app.after_request
 def after_request(response):
-    response.headers["Access-Control-Allow-Origin"] = "*" # <- You can change "*" for a domain for example "http://localhost"
+    response.headers["Access-Control-Allow-Origin"] = "*" 
     response.headers["Access-Control-Allow-Credentials"] = "true"
     response.headers["Access-Control-Allow-Methods"] = "POST, GET, OPTIONS, PUT, DELETE"
     response.headers["Access-Control-Allow-Headers"] = "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization"
@@ -52,8 +76,84 @@ Api_Key = "b0aa597e242f93ff1ec1681b38eea56b"
 
 
 
+
+def color_windows():
+    
+    version = platform.version().split('.')
+    if os.name == 'nt' and platform.release() == '10' and (int(version[0]), int(version[1]), int(version[2])) >= (10, 0, 14393):
+        kernel32 = ctypes.windll.kernel32
+        kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
+        
+def desencriptar_con_clave_privada(clave_privada, mensaje_cifrado):
+    try:
+        mensaje_descifrado = clave_privada.decrypt(
+            mensaje_cifrado,
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
+        )
+        return mensaje_descifrado
+    except Exception as e:
+        print(f"Error al desencriptar: {e}")
+        return None
+
+def cargar_clave_privada():
+    try:    
+        ruta_archivo="claves_pri_engine\privada_engine.pem"
+
+        if not os.path.exists(ruta_archivo):
+            print("Archivo de clave privada no encontrado.")
+            return None
+
+        with open(ruta_archivo, 'rb') as archivo_clave:
+            clave_privada = serialization.load_pem_private_key(
+                archivo_clave.read(),
+                password=None, 
+                backend=default_backend()
+            )
+    except Exception as e:
+        print(f"la excepcion es :  {e}")
+    return clave_privada
+
+def guardar_clave_privada(clave_privada_bytes):
+    directorio = "claves_pri_engine"
+    nombre_archivo = "privada_engine.pem"
+
+    # Crear directorio si no existe
+    if not os.path.exists(directorio):
+        os.makedirs(directorio)
+
+    ruta_archivo = os.path.join(directorio, nombre_archivo)
+
+    # Guardar la clave privada en formato bytes
+    with open(ruta_archivo, 'wb') as archivo_clave:
+        archivo_clave.write(clave_privada_bytes)
+
+def genera_claves():
+   
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+    )
+    public_key = private_key.public_key()
+    
+    private_key_serializada = private_key.private_bytes(
+        encoding= serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption()
+        
+    )
+    public_key_serializada = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+    return private_key_serializada, public_key_serializada
+    
+
 def iniciar_flask():
-    app.run(host="0.0.0.0", debug=True, use_reloader=False, port=5000)  # Asegúrate de elegir un puerto adecuado
+    app.run(host="0.0.0.0", port=5000)  # Asegúrate de elegir un puerto adecuado
 
 def pintando_mapas(drones_autenticados):
     global debe_continuar
@@ -160,13 +260,23 @@ def consultar_clima(lock):
     
 
 def inicializar_productor(broker_address):
-    return KafkaProducer(bootstrap_servers=broker_address)
+    return KafkaProducer(bootstrap_servers=broker_address,
+        security_protocol="SSL",
+         ssl_check_hostname=False, 
+        ssl_cafile="claves\mycert.crt",  
+        ssl_certfile="claves\mycert.crt",  
+        ssl_keyfile="claves/mykey.key"  
 
-
+    )
 def inicializar_consumidor(topic, broker_address):
     consumer = KafkaConsumer(
         topic,
         bootstrap_servers=broker_address,
+        security_protocol="SSL",
+        ssl_check_hostname=False,  # AL SER AUTOFIRMADO DEBERIAMOS HABER ESPECIFICADO LA IP CON LA QUE IBAMOS A TRABJAR PERO ES MEJOR NO HACER EL CHECK
+        ssl_cafile="claves\mycert.crt",  
+        ssl_certfile="claves\mycert.crt",  
+        ssl_keyfile="claves/mykey.key",  
         enable_auto_commit=True, 
         value_deserializer=lambda x: json.loads(x.decode('utf-8'))
         
@@ -259,9 +369,16 @@ def manejar_conexion(conexion,ad_engine,lock):
     
     global drones_autenticados, condicion_drones
     try:
-        data = conexion.recv(1024).decode()
-        data =desempaquetar_string(data)
+        conexion.send(clave_publica)
         
+        data = conexion.recv(1024)
+     
+        data = desencriptar_con_clave_privada(cargar_clave_privada(),data)
+
+        data = data.decode("utf-8")
+        print(data)
+        data =desempaquetar_string(data)
+        print(data)
         if not data:
             conexion.send("Formato incorrecto").encode()
             conexion.close()#le cerramos la conexion
@@ -292,9 +409,9 @@ def separar_arg(arg):
     parte=arg.split(':')
     return parte[0] , int(parte[1]) 
 
-def pintar_mapa(drones_autenticados, dimension=20):
+from termcolor import colored
 
-    
+def pintar_mapa(drones_autenticados, dimension=20):
     # Convertir la lista de drones en un diccionario basado en el identificador del dron
     drones_dict = {dron.identificador: dron for dron in drones_autenticados}
     
@@ -316,10 +433,9 @@ def pintar_mapa(drones_autenticados, dimension=20):
         for cell in mapa[i]:
             if cell != ' ':
                 dron_id = int(cell)
-                if drones_dict[dron_id].llego_a_destino: 
-                    linea_elemento.append(GREEN + cell + END)
-                else:
-                    linea_elemento.append(RED + cell + END)
+                color = 'green' if drones_dict[dron_id].llego_a_destino else 'red'
+                cell_colored = colored(cell, color)
+                linea_elemento.append(cell_colored)
             else:
                 linea_elemento.append(cell)
         linea.append(f"{i:02} | [" + "] [".join(linea_elemento) + "] | " + f"{i:02}")
@@ -328,6 +444,7 @@ def pintar_mapa(drones_autenticados, dimension=20):
     mapa = '\n'.join(linea)
     
     return mapa
+
     
 class Dron:
     def __init__(self, identificador, posicion):
@@ -395,10 +512,14 @@ if __name__ == "__main__":
         print("Error de argumentos..")
         sys.exit(1)
     try:    
-        
+        color_windows()
         flask_thread = threading.Thread(target=iniciar_flask)
         flask_thread.start()
         inicializar_json()
+        debe_iniciar_espectaculo = threading.Event()
+        clave_privada , clave_publica = genera_claves()
+        guardar_clave_privada(clave_privada)
+        clave_privada = None
         
         debe_continuar =True        
         clima_adverso = False  
@@ -412,7 +533,16 @@ if __name__ == "__main__":
         
         motor = AD_Engine()  
         puerto_escucha, numero_drones, ip_puerto_broker = sys.argv[1:4]
-        administrador  = KafkaAdminClient(bootstrap_servers = ip_puerto_broker)
+       #administrador  = KafkaAdminClient(bootstrap_servers = ip_puerto_broker)
+        administrador = KafkaAdminClient(
+            bootstrap_servers = ip_puerto_broker,
+            security_protocol="SSL",
+            ssl_cafile="claves\mycert.crt",  # Este es el certificado de confianza, generalmente el de la CA.
+            ssl_certfile="claves\mycert.crt",  # Este es el certificado del cliente.
+            ssl_keyfile="claves/mykey.key",  # Esta es la clave privada del cliente.
+            ssl_check_hostname=False 
+        )
+
         try:
             creacion_topics(administrador) 
         except Exception as e:
@@ -428,7 +558,8 @@ if __name__ == "__main__":
             while len(drones_autenticados) < numero_drones_figura:
                 print("Esperando la conexion de drones necesarios para iniciar el espectaculo....")
                 condicion_drones.wait()
-        input("Se han conectado los drones necesarios, pulse cualquier tecla para iniciar el espectaculo")
+        print("Se han conectado los drones necesarios. Esperando al frontend para que envie iniciar el espectaculo")
+        debe_iniciar_espectaculo.wait()
         threading.Thread(target=verificar_drones_desconectados).start()
         destinos = complementar_destinos(destinos)
         figura_base = {
@@ -504,6 +635,7 @@ if __name__ == "__main__":
             for dron in drones_autenticados:
                 dron.reset()
         print("ha llegado el espectaculo al final")
+        drones_autenticados =[]
         debe_continuar =False #lo usamos para cerrar los hilos
     
         try:
