@@ -222,7 +222,7 @@ def verificar_drones_desconectados():
     print("SE CIERRA")
 
 #comprueba clima
-def consultar_clima(lock):
+# def consultar_clima(lock):
     global clima_adverso
     global debe_continuar 
     API_URL = "http://api.openweathermap.org/data/2.5/weather?"

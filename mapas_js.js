@@ -10,10 +10,7 @@ var DroneMapApp = (function() {
     var dronePositions = {};
 
 
-    function refrescar(){ 
-        location.reload();
-    }
-    setInterval(refrescar,5000)
+
 
     function mandarbase() {
         // Cambia la URL a la que necesitas enviar la solicitud POST
